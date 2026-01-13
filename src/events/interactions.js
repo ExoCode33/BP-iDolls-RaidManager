@@ -3,7 +3,8 @@ const {
   StringSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle
+  TextInputStyle,
+  InteractionContextType
 } = require('discord.js');
 const {
   getRaid,
@@ -47,7 +48,7 @@ async function handleButton(interaction) {
 }
 
 async function handleRegistration(interaction, raidId, registrationType) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const raid = await getRaid(raidId);
@@ -101,27 +102,27 @@ async function handleRegistration(interaction, raidId, registrationType) {
 
     if (options.length > 0) {
       options.push({
-        label: '─────────────────────────────',
+        label: '────────────────────────',
         value: 'separator',
-        description: 'Manual Entry Options',
+        description: 'My character is not listed',
         disabled: true
       });
     }
 
     options.push({
-      label: 'Register as Tank (No Character)',
+      label: 'Tank (My Character is not listed)',
       value: `manual_tank_${registrationType}`,
       emoji: '🛡️'
     });
 
     options.push({
-      label: 'Register as DPS (No Character)',
+      label: 'DPS (My Character is not listed)',
       value: `manual_dps_${registrationType}`,
       emoji: '⚔️'
     });
 
     options.push({
-      label: 'Register as Support (No Character)',
+      label: 'Support (My Character is not listed)',
       value: `manual_support_${registrationType}`,
       emoji: '💚'
     });
@@ -148,22 +149,20 @@ async function handleCharacterSelect(interaction) {
   const [, , raidId, registrationType] = interaction.customId.split('_');
   const selection = interaction.values[0];
 
-  await interaction.deferUpdate();
-
   try {
     const raid = await getRaid(parseInt(raidId));
     if (!raid) {
-      return await interaction.followUp({ 
+      return await interaction.reply({ 
         content: '❌ Raid not found!', 
-        ephemeral: true 
+        flags: 64
       });
     }
 
     const existing = await getRegistration(parseInt(raidId), interaction.user.id);
     if (existing) {
-      return await interaction.followUp({ 
+      return await interaction.reply({ 
         content: '❌ You are already registered for this raid!', 
-        ephemeral: true 
+        flags: 64
       });
     }
 
@@ -174,6 +173,8 @@ async function handleCharacterSelect(interaction) {
     }
 
     if (selection.startsWith('char_')) {
+      await interaction.deferUpdate();
+      
       const characterId = parseInt(selection.split('_')[1]);
       const { getCharacterById } = require('../database/queries');
       const character = await getCharacterById(characterId);
@@ -181,7 +182,7 @@ async function handleCharacterSelect(interaction) {
       if (!character) {
         return await interaction.followUp({ 
           content: '❌ Character not found!', 
-          ephemeral: true 
+          flags: 64
         });
       }
 
@@ -190,10 +191,17 @@ async function handleCharacterSelect(interaction) {
 
   } catch (error) {
     console.error('Character select error:', error);
-    await interaction.followUp({ 
-      content: '❌ An error occurred. Please try again.', 
-      ephemeral: true 
-    });
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ 
+        content: '❌ An error occurred. Please try again.', 
+        flags: 64
+      });
+    } else {
+      await interaction.followUp({ 
+        content: '❌ An error occurred. Please try again.', 
+        flags: 64
+      });
+    }
   }
 }
 
@@ -212,7 +220,7 @@ async function showManualEntryModal(interaction, raidId, registrationType, role)
     .setCustomId('class')
     .setLabel('Class')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g., StormBlade, HeavyGuardian')
+    .setPlaceholder('e.g., Storm Blade, Heavy Guardian')
     .setRequired(true);
 
   const subclassInput = new TextInputBuilder()
@@ -241,7 +249,7 @@ async function showManualEntryModal(interaction, raidId, registrationType, role)
 async function handleManualModal(interaction) {
   const [, , raidId, registrationType, role] = interaction.customId.split('_');
 
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const raid = await getRaid(parseInt(raidId));
@@ -331,7 +339,7 @@ async function processRegistration(interaction, raid, character, registrationTyp
 }
 
 async function handleUnregister(interaction, raidId) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const raid = await getRaid(raidId);
