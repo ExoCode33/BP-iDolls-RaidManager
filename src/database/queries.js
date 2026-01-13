@@ -274,6 +274,16 @@ async function getUserRaids(userId) {
   );
   return result.rows;
 }
+}
+
+// Helper functions for admin commands
+async function completeRaid(raidId) {
+  return await updateRaidStatus(raidId, 'completed');
+}
+
+async function cancelRaid(raidId) {
+  return await updateRaidStatus(raidId, 'cancelled');
+}
 
 module.exports = {
   // Config
@@ -296,6 +306,8 @@ module.exports = {
   getAvailableRaidSlot,
   markRaidReminded,
   getUpcomingRaids,
+  completeRaid,
+  cancelRaid,
   
   // Registrations
   createRegistration,
