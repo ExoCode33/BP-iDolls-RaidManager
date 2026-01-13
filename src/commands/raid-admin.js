@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, PermissionFlagsBits } = require('discord.js');
-const { getActiveRaids, getRaid, completeRaid, cancelRaid, updateRaidMessage } = require('../database/raids');
+const { getActiveRaids, getRaid, updateRaidStatus } = require('../database/queries');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -43,7 +43,7 @@ module.exports = {
       const options = raids.map(raid => ({
         label: raid.name,
         value: raid.id.toString(),
-        description: `Started: ${new Date(raid.start_time).toLocaleString()}`
+        description: `Starts: ${new Date(raid.start_time).toLocaleString()}`
       }));
 
       const selectMenu = new StringSelectMenuBuilder()
