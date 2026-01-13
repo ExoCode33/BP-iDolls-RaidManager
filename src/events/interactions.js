@@ -159,6 +159,14 @@ async function handleCharacterSelect(interaction) {
       });
     }
 
+    const existing = await getRegistration(parseInt(raidId), interaction.user.id);
+    if (existing) {
+      return await interaction.followUp({ 
+        content: '❌ You are already registered for this raid!', 
+        ephemeral: true 
+      });
+    }
+
     if (selection.startsWith('manual_')) {
       const [, role] = selection.split('_');
       await showManualEntryModal(interaction, parseInt(raidId), registrationType, role);
