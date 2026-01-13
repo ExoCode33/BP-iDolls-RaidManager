@@ -280,7 +280,7 @@ async function handleManualModal(interaction) {
 async function processRegistration(interaction, raid, character, registrationType, source) {
   try {
     const counts = await getRaidCounts(raid.id);
-    const role = character.role || inferRole(character.class);
+    const role = inferRole(character.class);
 
     let status;
     if (isRaidFull(counts, raid.raid_size) || isRoleFull(role, counts, raid)) {
