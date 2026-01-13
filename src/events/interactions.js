@@ -14,6 +14,7 @@ const {
 } = require('../database/queries');
 const { getClassEmoji, inferRole } = require('../utils/formatters');
 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
+const raidHandlers = require('./raid-handlers');
 
 // Store temporary manual registration state
 const manualRegState = new Map();
@@ -746,5 +747,6 @@ module.exports = {
   handleManualScoreSelect,
   handleManualIGNModal,
   handleManualBackToClass,
-  handleManualBackToSubclass
+  handleManualBackToSubclass,
+  ...raidHandlers
 };
