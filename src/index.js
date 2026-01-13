@@ -127,6 +127,7 @@ client.once(Events.ClientReady, async (c) => {
   startReminderScheduler(client);
 });
 
+
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
@@ -138,8 +139,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await handleButton(interaction);
     }
     else if (interaction.isStringSelectMenu()) {
-      const { handleButton: handleSelect } = require('./events/interactions');
-      await handleSelect(interaction);
+      // Route select menus correctly
+      if (interaction.customId.startsWith('char_select_')) {
+        const { handleCharacterSelect } = require('./events/interactions');
+        await handleCharacterSelect(interaction);
+      } else {
+        // Admin dropdowns and other select menus
+        await handleButton(interaction);
+      }
     }
     else if (interaction.isModalSubmit()) {
       await handleManualModal(interaction);
