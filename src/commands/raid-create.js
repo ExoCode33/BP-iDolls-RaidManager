@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 const { eventDB } = require('../database/connection');
-const { createRaidPost } = require('../database/raids');
+const { createRaidPost } = require('../database/queries');
 
 module.exports = {
   data: new SlashCommandBuilder()
