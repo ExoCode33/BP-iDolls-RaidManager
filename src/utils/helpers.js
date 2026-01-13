@@ -15,7 +15,7 @@ const roleEmojis = {
   Support: '💚'
 };
 
-// Class to role mapping
+// Class to role mapping - FIXED!
 const classToRole = {
   'HeavyGuardian': 'Tank',
   'ShieldKnight': 'Tank',
@@ -55,7 +55,6 @@ function formatPlayerLine(registration, showTag = false) {
 }
 
 function parseDateTime(dateStr, timeStr) {
-  // Expecting format: "2025-12-27" and "02:00"
   const combined = `${dateStr}T${timeStr}:00Z`;
   return new Date(combined);
 }
@@ -80,7 +79,7 @@ function getRaidSlotLabel(raidSlot) {
 
 function chunkArray(array, size) {
   const chunks = [];
-  for (let i = 0; i < array < size; i += size) {
+  for (let i = 0; i < array.length; i += size) {
     chunks.push(array.slice(i, i + size));
   }
   return chunks;
@@ -131,7 +130,7 @@ function parsePowerRange(rangeStr) {
   if (rangeStr === '38k+') return 38000;
   const match = rangeStr.match(/(\d+)-(\d+)k/);
   if (match) {
-    return parseInt(match[1]) * 1000; // Return lower bound
+    return parseInt(match[1]) * 1000;
   }
   return 0;
 }
