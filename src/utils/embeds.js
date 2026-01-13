@@ -61,6 +61,11 @@ function createRaidEmbed(raid, registrations) {
     inline: false 
   });
 
+  // Add lock indicator if raid is locked
+  if (raid.locked) {
+    embed.setFooter({ text: '🔒 Registration Locked' });
+  }
+
   return embed;
 }
 
@@ -84,9 +89,11 @@ function categorizeRegistrations(registrations) {
   };
 }
 
-function createRaidButtons(raidId) {
-  const row = new ActionRowBuilder()
-    .addComponents(
+function createRaidButtons(raidId, isLocked = false) {
+  const row = new ActionRowBuilder();
+
+  if (!isLocked) {
+    row.addComponents(
       new ButtonBuilder()
         .setCustomId(`register_${raidId}`)
         .setLabel('Register')
@@ -94,12 +101,16 @@ function createRaidButtons(raidId) {
       new ButtonBuilder()
         .setCustomId(`assist_${raidId}`)
         .setLabel('I can help')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId(`unregister_${raidId}`)
-        .setLabel('Unregister')
-        .setStyle(ButtonStyle.Danger)
+        .setStyle(ButtonStyle.Primary)
     );
+  }
+
+  row.addComponents(
+    new ButtonBuilder()
+      .setCustomId(`unregister_${raidId}`)
+      .setLabel('Unregister')
+      .setStyle(ButtonStyle.Danger)
+  );
 
   return row;
 }
