@@ -274,7 +274,6 @@ async function getUserRaids(userId) {
   );
   return result.rows;
 }
-}
 
 // Helper functions for admin commands
 async function completeRaid(raidId) {
