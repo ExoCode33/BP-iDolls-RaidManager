@@ -3,8 +3,7 @@ const {
   StringSelectMenuBuilder,
   ModalBuilder,
   TextInputBuilder,
-  TextInputStyle,
-  InteractionContextType
+  TextInputStyle
 } = require('discord.js');
 const {
   getRaid,
