@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { Client, GatewayIntentBits, Collection, Events } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const { startReminderScheduler } = require('./utils/scheduler');
@@ -15,6 +15,7 @@ const client = new Client({
 
 // Load commands
 client.commands = new Collection();
+const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
@@ -23,6 +24,7 @@ for (const file of commandFiles) {
   const command = require(filePath);
   if ('data' in command && 'execute' in command) {
     client.commands.set(command.data.name, command);
+    commands.push(command.data.toJSON());
   }
 }
 
@@ -100,7 +102,31 @@ ON CONFLICT (key) DO NOTHING;
     console.log('✅ Database migrations completed');
   } catch (error) {
     console.error('❌ Migration failed:', error);
-    console.error('Please run: npm run db:migrate');
+  }
+}
+
+// Deploy commands automatically
+async function deployCommands() {
+  console.log(`🔄 Deploying ${commands.length} slash commands...`);
+  try {
+    const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+
+    // Deploy to guild if GUILD_ID provided, otherwise deploy globally
+    if (process.env.DISCORD_GUILD_ID) {
+      await rest.put(
+        Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
+        { body: commands },
+      );
+      console.log(`✅ Successfully deployed ${commands.length} guild commands`);
+    } else {
+      await rest.put(
+        Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
+        { body: commands },
+      );
+      console.log(`✅ Successfully deployed ${commands.length} global commands`);
+    }
+  } catch (error) {
+    console.error('❌ Command deployment failed:', error);
   }
 }
 
@@ -111,6 +137,9 @@ client.once(Events.ClientReady, async (c) => {
   
   // Run migrations on startup
   await runMigrations();
+  
+  // Deploy commands on startup
+  await deployCommands();
   
   // Start reminder scheduler
   startReminderScheduler(client);
@@ -166,3 +195,38 @@ process.on('unhandledRejection', error => {
 
 // Login
 client.login(process.env.DISCORD_TOKEN);
+```
+
+---
+
+## What Changed:
+
+✅ **Auto-runs migrations** on startup
+✅ **Auto-deploys commands** on startup
+✅ No manual `npm run deploy` needed
+✅ No manual `npm run db:migrate` needed
+
+---
+
+## Now Your Workflow:
+
+1. ✅ Set environment variables in Railway
+2. ✅ Deploy bot
+3. ✅ **Everything happens automatically!**
+   - Database migrations ✅
+   - Command deployment ✅
+   - Bot starts ✅
+4. ✅ Just run `/raid-setup` in Discord
+5. ✅ Start creating raids!
+
+---
+
+## Expected Startup Logs:
+```
+✅ Logged in as iDolls Raid Manager#9467
+📊 Serving 1 guild(s)
+🔄 Running database migrations...
+✅ Database migrations completed
+🔄 Deploying 2 slash commands...
+✅ Successfully deployed 2 guild commands
+✅ Reminder scheduler started
