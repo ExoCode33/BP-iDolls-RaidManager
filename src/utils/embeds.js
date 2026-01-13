@@ -16,7 +16,9 @@ async function createRaidEmbed(raid, registrations, counts) {
     grouped[correctRole][reg.status].push(reg);
   });
 
-  let description = `━━━━━━━━━━━━━━━━━━━━\n`;
+  const pinkLine = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
+  let description = `${pinkLine}\n`;
   description += `📅 ${raid.name}\n`;
   description += `👥 <@&${raid.main_role_id}> (${raidLabel})\n`;
   description += `🕐 <t:${timestamp}:F>\n`;
@@ -68,11 +70,11 @@ async function createRaidEmbed(raid, registrations, counts) {
     });
   }
 
-  description += `\n━━━━━━━━━━━━━━━━━━━━`;
+  description += `\n${pinkLine}`;
 
   const embed = new EmbedBuilder()
     .setDescription(description)
-    .setColor(0x5865F2)
+    .setColor(0xEB459E)
     .setFooter({ text: `Raid ID: ${raid.id}` });
 
   return embed;
