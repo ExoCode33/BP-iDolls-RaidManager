@@ -286,7 +286,7 @@ async function cancelRaid(raidId) {
 
 // Helper function for creating raid posts
 async function createRaidPost(raid, channel) {
-  const { createRaidEmbed, createRaidButtons } = require('../../utils/embeds');
+  const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
   const embed = createRaidEmbed(raid, []);
   const buttons = createRaidButtons(raid.id);
   
