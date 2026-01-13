@@ -16,10 +16,10 @@ async function createRaidEmbed(raid, registrations, counts) {
     grouped[correctRole][reg.status].push(reg);
   });
 
-  const pinkLine = '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━';
-
-  let description = `${pinkLine}\n`;
-  description += `📅 ${raid.name}\n`;
+  // Build the content inside ANSI code block for pink lines
+  let ansiContent = '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
+  
+  let description = `📅 **${raid.name}**\n`;
   description += `👥 <@&${raid.main_role_id}> (${raidLabel})\n`;
   description += `🕐 <t:${timestamp}:F>\n`;
   description += `Raid Size: ${raid.raid_size}-Player (${counts.total_registered}/${raid.raid_size})\n\n`;
@@ -70,10 +70,10 @@ async function createRaidEmbed(raid, registrations, counts) {
     });
   }
 
-  description += `\n${pinkLine}`;
+  const finalContent = '```ansi\n' + ansiContent + '```\n' + description + '\n```ansi\n\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```';
 
   const embed = new EmbedBuilder()
-    .setDescription(description)
+    .setDescription(finalContent)
     .setColor(0xEB459E)
     .setFooter({ text: `Raid ID: ${raid.id}` });
 
