@@ -284,6 +284,20 @@ async function cancelRaid(raidId) {
   return await updateRaidStatus(raidId, 'cancelled');
 }
 
+// Helper function for creating raid posts
+async function createRaidPost(raid, channel) {
+  const { createRaidEmbed, createRaidButtons } = require('../../utils/embeds');
+  const embed = createRaidEmbed(raid, []);
+  const buttons = createRaidButtons(raid.id);
+  
+  const message = await channel.send({
+    embeds: [embed],
+    components: [buttons]
+  });
+  
+  return message.id;
+}
+
 module.exports = {
   // Config
   getConfig,
@@ -307,6 +321,7 @@ module.exports = {
   getUpcomingRaids,
   completeRaid,
   cancelRaid,
+  createRaidPost,
   
   // Registrations
   createRegistration,
