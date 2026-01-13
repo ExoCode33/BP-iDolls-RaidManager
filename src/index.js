@@ -143,13 +143,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId.startsWith('char_select_')) {
         const { handleCharacterSelect } = require('./events/interactions');
         await handleCharacterSelect(interaction);
-      } else {
+      } 
+      else if (interaction.customId.startsWith('manual_select_class_')) {
+        const { handleManualClassSelect } = require('./events/interactions');
+        await handleManualClassSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('manual_select_subclass_')) {
+        const { handleManualSubclassSelect } = require('./events/interactions');
+        await handleManualSubclassSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('manual_select_score_')) {
+        const { handleManualScoreSelect } = require('./events/interactions');
+        await handleManualScoreSelect(interaction);
+      }
+      else {
         // Admin dropdowns and other select menus
         await handleButton(interaction);
       }
     }
     else if (interaction.isModalSubmit()) {
-      await handleManualModal(interaction);
+      if (interaction.customId.startsWith('manual_ign_modal_')) {
+        const { handleManualIGNModal } = require('./events/interactions');
+        await handleManualIGNModal(interaction);
+      } else {
+        await handleManualModal(interaction);
+      }
     }
   } catch (error) {
     console.error('Interaction error:', error);
