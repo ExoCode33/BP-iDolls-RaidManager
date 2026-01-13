@@ -53,7 +53,8 @@ CREATE TABLE IF NOT EXISTS raids (
   created_by VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
-  reminded_30m BOOLEAN DEFAULT false
+  reminded_30m BOOLEAN DEFAULT false,
+  locked BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS raid_registrations (
@@ -156,6 +157,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleManualScoreSelect } = require('./events/interactions');
         await handleManualScoreSelect(interaction);
       }
+      // NEW: Raid menu handlers
+      else if (interaction.customId.startsWith('raid_main_menu_')) {
+        const { handleRaidMainMenu } = require('./events/interactions');
+        await handleRaidMainMenu(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_create_time_')) {
+        const { handleTimeSelect } = require('./events/interactions');
+        await handleTimeSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_create_size_')) {
+        const { handleSizeSelect } = require('./events/interactions');
+        await handleSizeSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_create_channel_')) {
+        const { handleChannelSelect } = require('./events/interactions');
+        await handleChannelSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_start_select_')) {
+        const { handleStartSelect } = require('./events/interactions');
+        await handleStartSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_action_')) {
+        const { handleRaidAction } = require('./events/interactions');
+        await handleRaidAction(interaction);
+      }
       else {
         // Admin dropdowns and other select menus
         await handleButton(interaction);
@@ -165,7 +191,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
       if (interaction.customId.startsWith('manual_ign_modal_')) {
         const { handleManualIGNModal } = require('./events/interactions');
         await handleManualIGNModal(interaction);
-      } else {
+      }
+      // NEW: Raid modals
+      else if (interaction.customId.startsWith('raid_setup_modal_')) {
+        const { handleSetupModal } = require('./events/interactions');
+        await handleSetupModal(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_create_name_')) {
+        const { handleNameModal } = require('./events/interactions');
+        await handleNameModal(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_create_date_')) {
+        const { handleDateModal } = require('./events/interactions');
+        await handleDateModal(interaction);
+      }
+      else {
         await handleManualModal(interaction);
       }
     }
