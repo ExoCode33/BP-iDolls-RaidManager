@@ -62,9 +62,11 @@ function getPowerBracket(abilityScore) {
 function formatPlayerLine(registration, showTag = false) {
   const classEmoji = getClassEmoji(registration.class);
   const powerBracket = getPowerBracket(registration.ability_score);
+  
+  const assistIcon = registration.registration_type === 'assist' ? ' 🤝' : '';
   const tag = showTag ? ` (${registration.registration_type === 'register' ? 'Register' : 'Assist'})` : '';
   
-  return `${registration.ign} • ${registration.class} ${classEmoji} ${powerBracket}${tag}`;
+  return `${registration.ign} • ${registration.class} ${classEmoji} ${powerBracket}${assistIcon}${tag}`;
 }
 
 function parseDateTime(dateStr, timeStr) {
