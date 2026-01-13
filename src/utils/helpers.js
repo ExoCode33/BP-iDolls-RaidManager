@@ -15,7 +15,6 @@ const roleEmojis = {
   Support: '💚'
 };
 
-// Class to role mapping - FIXED!
 const classToRole = {
   'HeavyGuardian': 'Tank',
   'ShieldKnight': 'Tank',
