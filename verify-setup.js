@@ -14,16 +14,15 @@ async function verifySetup() {
   console.log('📋 Checking environment variables...');
   const requiredVars = [
     'DISCORD_TOKEN',
-    'DISCORD_CLIENT_ID',
-    'MAIN_DB_HOST',
-    'MAIN_DB_NAME',
-    'MAIN_DB_USER',
-    'MAIN_DB_PASSWORD',
-    'EVENT_DB_HOST',
-    'EVENT_DB_NAME',
-    'EVENT_DB_USER',
-    'EVENT_DB_PASSWORD'
+    'DISCORD_CLIENT_ID'
   ];
+
+  // Check for database config (either URL or individual vars)
+  const mainDbVars = ['MAIN_DB_URL', 'MAIN_PGHOST', 'MAIN_DB_HOST'];
+  const eventDbVars = ['EVENT_DB_URL', 'EVENT_PGHOST', 'EVENT_DB_HOST'];
+  
+  const hasMainDb = mainDbVars.some(v => process.env[v]);
+  const hasEventDb = eventDbVars.some(v => process.env[v]);
 
   for (const varName of requiredVars) {
     if (process.env[varName]) {
@@ -31,6 +30,18 @@ async function verifySetup() {
     } else {
       checks.failed.push(`❌ ${varName} is missing`);
     }
+  }
+  
+  if (hasMainDb) {
+    checks.passed.push('✅ Main DB configuration found');
+  } else {
+    checks.failed.push('❌ Main DB configuration missing (need MAIN_DB_URL or MAIN_PGHOST)');
+  }
+  
+  if (hasEventDb) {
+    checks.passed.push('✅ Event DB configuration found');
+  } else {
+    checks.failed.push('❌ Event DB configuration missing (need EVENT_DB_URL or EVENT_PGHOST)');
   }
 
   // Check Main DB connection
