@@ -1,101 +1,111 @@
-const { EmbedBuilder } = require('discord.js');
-const { getRoleEmoji, formatPlayerLine, getRaidSlotLabel, inferRole } = require('./helpers');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getClassEmoji, getPowerColor } = require('./formatters');
 
-async function createRaidEmbed(raid, registrations, counts) {
-  const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
-  const raidLabel = getRaidSlotLabel(raid.raid_slot);
-  
-  const grouped = {
-    Tank: { registered: [], waitlist: [] },
-    DPS: { registered: [], waitlist: [] },
-    Support: { registered: [], waitlist: [] }
-  };
+function createRaidEmbed(raid, registrations) {
+  const { registered, assist, waitlist } = categorizeRegistrations(registrations);
 
-  registrations.forEach(reg => {
-    const correctRole = inferRole(reg.class);
-    grouped[correctRole][reg.status].push(reg);
-  });
+  const tankRegistered = registered.filter(r => r.role === 'Tank');
+  const supportRegistered = registered.filter(r => r.role === 'Support');
+  const dpsRegistered = registered.filter(r => r.role === 'DPS');
 
-  // Professional header with ANSI colors
-  let headerContent = '';
-  headerContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
-  headerContent += '\u001b[1;37m           RAID EVENT\u001b[0m\n';
-  headerContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m';
-
-  let description = `\n### ${raid.name}\n`;
-  description += `> **Role:** <@&${raid.main_role_id}> (${raidLabel})\n`;
-  description += `> **When:** <t:${timestamp}:F> • <t:${timestamp}:R>\n`;
-  description += `> **Size:** ${raid.raid_size}-Player Raid\n`;
-  description += `> **Status:** ${counts.total_registered}/${raid.raid_size} Registered\n\n`;
-
-  // Tank section
-  description += `### ${getRoleEmoji('Tank')} Tank ${counts.Tank.registered}/${raid.tank_slots}\n`;
-  if (grouped.Tank.registered.length > 0) {
-    grouped.Tank.registered.forEach((reg, idx) => {
-      const isLast = idx === grouped.Tank.registered.length - 1;
-      const prefix = isLast ? '  ╰─' : '  ├─';
-      description += `${prefix} ${formatPlayerLine(reg)}\n`;
-    });
-  } else {
-    description += `  ╰─ *Waiting for tanks...*\n`;
-  }
-
-  // Support section
-  description += `\n### ${getRoleEmoji('Support')} Support ${counts.Support.registered}/${raid.support_slots}\n`;
-  if (grouped.Support.registered.length > 0) {
-    grouped.Support.registered.forEach((reg, idx) => {
-      const isLast = idx === grouped.Support.registered.length - 1;
-      const prefix = isLast ? '  ╰─' : '  ├─';
-      description += `${prefix} ${formatPlayerLine(reg)}\n`;
-    });
-  } else {
-    description += `  ╰─ *Waiting for supports...*\n`;
-  }
-
-  // DPS section
-  description += `\n### ${getRoleEmoji('DPS')} DPS ${counts.DPS.registered}/${raid.dps_slots}\n`;
-  if (grouped.DPS.registered.length > 0) {
-    grouped.DPS.registered.forEach((reg, idx) => {
-      const isLast = idx === grouped.DPS.registered.length - 1;
-      const prefix = isLast ? '  ╰─' : '  ├─';
-      description += `${prefix} ${formatPlayerLine(reg)}\n`;
-    });
-  } else {
-    description += `  ╰─ *Waiting for DPS...*\n`;
-  }
-
-  // Waitlist section
-  const allWaitlist = [
-    ...grouped.Tank.waitlist,
-    ...grouped.Support.waitlist,
-    ...grouped.DPS.waitlist
-  ].sort((a, b) => new Date(a.registered_at) - new Date(b.registered_at));
-
-  if (allWaitlist.length > 0) {
-    description += `\n### ⏳ Waitlist (${allWaitlist.length})\n`;
-    allWaitlist.forEach((reg, idx) => {
-      const isLast = idx === allWaitlist.length - 1;
-      const prefix = isLast ? '  ╰─' : '  ├─';
-      description += `${prefix} ${formatPlayerLine(reg, true)}\n`;
-    });
-  }
-
-  // Professional footer with ANSI colors
-  let footerContent = '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
-  footerContent += '\u001b[1;30m          Click buttons to join\u001b[0m\n';
-  footerContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m';
-
-  const finalContent = '```ansi\n' + headerContent + '\n```' + description + '```ansi\n' + footerContent + '\n```';
+  const tankAssist = assist.filter(r => r.role === 'Tank');
+  const supportAssist = assist.filter(r => r.role === 'Support');
+  const dpsAssist = assist.filter(r => r.role === 'DPS');
 
   const embed = new EmbedBuilder()
-    .setDescription(finalContent)
-    .setColor(0xEB459E)
-    .setFooter({ text: `Raid ID: ${raid.id} • iDolls Raid System` })
-    .setTimestamp();
+    .setColor(0xEC4899) // Pink color
+    .setTitle(`${raid.name}`)
+    .setDescription(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n<t:${Math.floor(new Date(raid.start_time).getTime() / 1000)}:F>\n<@&${raid.main_role_id}>`);
+
+  // Tank Section
+  let tankText = `**Tank (${tankRegistered.length}/${raid.tank_slots}):**\n`;
+  tankText += formatRoleSection(tankRegistered, raid.tank_slots);
+  if (tankAssist.length > 0) {
+    tankText += `\n*Assist:*\n${formatRoleSection(tankAssist, 0)}`;
+  }
+
+  // Support Section  
+  let supportText = `**Support (${supportRegistered.length}/${raid.support_slots}):**\n`;
+  supportText += formatRoleSection(supportRegistered, raid.support_slots);
+  if (supportAssist.length > 0) {
+    supportText += `\n*Assist:*\n${formatRoleSection(supportAssist, 0)}`;
+  }
+
+  // DPS Section
+  let dpsText = `**DPS (${dpsRegistered.length}/${raid.dps_slots}):**\n`;
+  dpsText += formatRoleSection(dpsRegistered, raid.dps_slots);
+  if (dpsAssist.length > 0) {
+    dpsText += `\n*Assist:*\n${formatRoleSection(dpsAssist, 0)}`;
+  }
+
+  embed.addFields(
+    { name: '\u200b', value: tankText, inline: false },
+    { name: '\u200b', value: supportText, inline: false },
+    { name: '\u200b', value: dpsText, inline: false }
+  );
+
+  // Waitlist
+  if (waitlist.length > 0) {
+    let waitlistText = waitlist.map(reg => {
+      const powerColor = getPowerColor(reg.ability_score);
+      const classEmoji = getClassEmoji(reg.class);
+      return `${powerColor} <@${reg.user_id}> - ${reg.ign} ${classEmoji}`;
+    }).join('\n');
+    
+    embed.addFields({ name: '**Waitlist:**', value: waitlistText, inline: false });
+  }
+
+  embed.addFields({ 
+    name: '\u200b', 
+    value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
+    inline: false 
+  });
 
   return embed;
 }
 
+function formatRoleSection(registrations, maxSlots) {
+  if (registrations.length === 0) {
+    return '*Empty*';
+  }
+
+  return registrations.map((reg, index) => {
+    const powerColor = getPowerColor(reg.ability_score);
+    const classEmoji = getClassEmoji(reg.class);
+    return `${powerColor} <@${reg.user_id}> - ${reg.ign} ${classEmoji}`;
+  }).join('\n');
+}
+
+function categorizeRegistrations(registrations) {
+  return {
+    registered: registrations.filter(r => r.status === 'registered'),
+    assist: registrations.filter(r => r.status === 'assist'),
+    waitlist: registrations.filter(r => r.status === 'waitlist')
+  };
+}
+
+function createRaidButtons(raidId) {
+  const row = new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(`register_${raidId}`)
+        .setLabel('Register')
+        .setStyle(ButtonStyle.Success),
+      new ButtonBuilder()
+        .setCustomId(`assist_${raidId}`)
+        .setLabel('I can help')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(`unregister_${raidId}`)
+        .setLabel('Unregister')
+        .setStyle(ButtonStyle.Danger)
+    );
+
+  return row;
+}
+
 module.exports = {
-  createRaidEmbed
+  createRaidEmbed,
+  createRaidButtons,
+  categorizeRegistrations
 };
