@@ -1,0 +1,38 @@
+// ═══════════════════════════════════════════════════════════════
+// RAID HANDLERS INDEX
+// Export all raid-related handlers from one place
+// ═══════════════════════════════════════════════════════════════
+
+const { handleRaidMainMenu } = require('./main-menu');
+const { showSetupModal, handleSetupModal } = require('./setup-handlers');
+const { 
+  startCreateFlow, 
+  handleNameModal, 
+  handleDateModal, 
+  handleTimeSelect, 
+  handleSizeSelect, 
+  handleChannelSelect 
+} = require('./create-handlers');
+const { showStartRaidSelector, handleStartSelect } = require('./start-handlers');
+const { handleRaidAction } = require('./action-handlers');
+
+module.exports = {
+  // Main menu
+  handleRaidMainMenu,
+  
+  // Setup
+  handleSetupModal,
+  
+  // Create flow
+  handleNameModal,
+  handleDateModal,
+  handleTimeSelect,
+  handleSizeSelect,
+  handleChannelSelect,
+  
+  // Start
+  handleStartSelect,
+  
+  // Actions (lock/unlock/complete/cancel/repost/refresh)
+  handleRaidAction
+};
