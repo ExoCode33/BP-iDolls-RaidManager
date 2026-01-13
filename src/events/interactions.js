@@ -1,4 +1,4 @@
-const { StringSelectMenuBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
+const { StringSelectMenuBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { 
   getRaid, 
   getRegistration, 
@@ -15,12 +15,41 @@ const {
 const { getClassEmoji, inferRole } = require('../utils/formatters');
 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
 
+// Store temporary manual registration state
+const manualRegState = new Map();
+
+// Class definitions
+const CLASSES = {
+  'Beat Performer': { role: 'Support', subclasses: ['Panacea', 'Chroma'] },
+  'Frost Mage': { role: 'DPS', subclasses: ['Hail', 'Frostfire'] },
+  'Heavy Guardian': { role: 'Tank', subclasses: ['Fortress', 'Vanguard'] },
+  'Marksman': { role: 'DPS', subclasses: ['Precision', 'Blitz'] },
+  'Shield Knight': { role: 'Tank', subclasses: ['Recovery', 'Sentinel'] },
+  'Storm Blade': { role: 'DPS', subclasses: ['Iaido', 'Flow'] },
+  'Verdant Oracle': { role: 'Support', subclasses: ['Lifebind', 'Nature'] },
+  'Wind Knight': { role: 'DPS', subclasses: ['Tempest', 'Gale'] }
+};
+
+const ABILITY_SCORES = [
+  { label: '28-30k', value: '28000' },
+  { label: '30-32k', value: '30000' },
+  { label: '32-34k', value: '32000' },
+  { label: '34-36k', value: '34000' },
+  { label: '36-38k', value: '36000' },
+  { label: '38k+', value: '38000' }
+];
+
 async function handleButton(interaction) {
   const [action, raidId] = interaction.customId.split('_');
 
   // Handle admin dropdown selections
   if (action === 'admin') {
     return await handleAdminSelect(interaction);
+  }
+
+  // Handle manual registration step buttons
+  if (action === 'manual' && interaction.customId.includes('class_')) {
+    return await showManualClassSelection(interaction);
   }
 
   if (action === 'unregister') {
@@ -31,8 +60,276 @@ async function handleButton(interaction) {
   await handleRegistration(interaction, parseInt(raidId), registrationType);
 }
 
+async function showManualClassSelection(interaction) {
+  const parts = interaction.customId.split('_');
+  const raidId = parts[2];
+  const registrationType = parts[3];
+
+  await interaction.deferReply({ flags: 64 });
+
+  try {
+    // Store initial state
+    manualRegState.set(interaction.user.id, {
+      raidId: parseInt(raidId),
+      registrationType,
+      step: 'class'
+    });
+
+    const classOptions = Object.entries(CLASSES).map(([className, data]) => {
+      const emoji = getClassEmoji(className);
+      let emojiObj = undefined;
+      
+      if (emoji) {
+        const match = emoji.match(/<:(\w+):(\d+)>/);
+        if (match) {
+          emojiObj = { name: match[1], id: match[2] };
+        }
+      }
+
+      return {
+        label: className,
+        value: className,
+        description: data.role,
+        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+      };
+    });
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`manual_select_class_${interaction.user.id}`)
+      .setPlaceholder('🎭 Select your class')
+      .addOptions(classOptions);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`back_to_char_select_${raidId}_${registrationType}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: '**Step 1/3:** Select your class',
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Show manual class error:', error);
+    await interaction.editReply({ content: '❌ An error occurred!' });
+  }
+}
+
+async function handleManualClassSelect(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  try {
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
+    }
+
+    const selectedClass = interaction.values[0];
+    state.class = selectedClass;
+    state.step = 'subclass';
+    manualRegState.set(interaction.user.id, state);
+
+    const subclasses = CLASSES[selectedClass].subclasses;
+    const classRole = CLASSES[selectedClass].role;
+    const classEmoji = getClassEmoji(selectedClass);
+    
+    let emojiObj = undefined;
+    if (classEmoji) {
+      const match = classEmoji.match(/<:(\w+):(\d+)>/);
+      if (match) {
+        emojiObj = { name: match[1], id: match[2] };
+      }
+    }
+
+    const subclassOptions = subclasses.map(subclass => ({
+      label: subclass,
+      value: subclass,
+      description: classRole,
+      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`manual_select_subclass_${interaction.user.id}`)
+      .setPlaceholder('✨ Select your subclass')
+      .addOptions(subclassOptions);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`manual_back_to_class_${interaction.user.id}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: `**Step 2/3:** Select your subclass\nClass: **${selectedClass}**`,
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Manual class select error:', error);
+    await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
+  }
+}
+
+async function handleManualSubclassSelect(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  try {
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
+    }
+
+    const selectedSubclass = interaction.values[0];
+    state.subclass = selectedSubclass;
+    state.step = 'score';
+    manualRegState.set(interaction.user.id, state);
+
+    const scoreOptions = ABILITY_SCORES.map(score => ({
+      label: score.label,
+      value: score.value,
+      description: 'Combat Power',
+      emoji: '💪'
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`manual_select_score_${interaction.user.id}`)
+      .setPlaceholder('⚔️ Select your ability score')
+      .addOptions(scoreOptions);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`manual_back_to_subclass_${interaction.user.id}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: `**Step 3/3:** Select your ability score\nClass: **${state.class}** | Subclass: **${selectedSubclass}**`,
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Manual subclass select error:', error);
+    await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
+  }
+}
+
+async function handleManualScoreSelect(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  try {
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.reply({ content: '❌ Session expired. Please start again.', flags: 64 });
+    }
+
+    const selectedScore = interaction.values[0];
+    state.abilityScore = parseInt(selectedScore);
+    manualRegState.set(interaction.user.id, state);
+
+    // Show modal for IGN
+    const modal = new ModalBuilder()
+      .setCustomId(`manual_ign_modal_${interaction.user.id}`)
+      .setTitle('Final Step: Enter IGN');
+
+    const ignInput = new TextInputBuilder()
+      .setCustomId('ign')
+      .setLabel('In-Game Name')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Enter your character name')
+      .setRequired(true);
+
+    const row = new ActionRowBuilder().addComponents(ignInput);
+    modal.addComponents(row);
+
+    await interaction.showModal(modal);
+
+  } catch (error) {
+    console.error('Manual score select error:', error);
+    if (!interaction.replied) {
+      await interaction.reply({ content: '❌ An error occurred!', flags: 64 });
+    }
+  }
+}
+
+async function handleManualIGNModal(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferReply({ flags: 64 });
+
+  try {
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.editReply({ content: '❌ Session expired. Please start again.' });
+    }
+
+    const raid = await getRaid(state.raidId);
+    if (!raid) {
+      manualRegState.delete(interaction.user.id);
+      return await interaction.editReply({ content: '❌ Raid not found!' });
+    }
+
+    const ign = interaction.fields.getTextInputValue('ign');
+
+    const character = {
+      id: null,
+      ign,
+      class: state.class,
+      subclass: state.subclass,
+      ability_score: state.abilityScore
+    };
+
+    // Clean up state
+    manualRegState.delete(interaction.user.id);
+
+    await processRegistration(interaction, raid, character, state.registrationType, 'manual');
+
+  } catch (error) {
+    console.error('Manual IGN modal error:', error);
+    manualRegState.delete(interaction.user.id);
+    await interaction.editReply({ content: '❌ An error occurred!' });
+  }
+}
+
+// Back button handlers for manual registration
+async function handleManualBackToClass(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await showManualClassSelection(interaction);
+}
+
+async function handleManualBackToSubclass(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  const state = manualRegState.get(interaction.user.id);
+  if (!state || !state.class) {
+    return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
+  }
+
+  // Go back to subclass selection
+  await handleManualClassSelect(interaction);
+}
+
 async function handleAdminSelect(interaction) {
-  await interaction.deferReply({ flags: 64 }); // Ephemeral
+  await interaction.deferReply({ flags: 64 });
 
   try {
     const [, subcommand, ] = interaction.customId.split('_');
@@ -50,7 +347,6 @@ async function handleAdminSelect(interaction) {
       case 'complete':
         await updateRaidStatus(raidId, 'completed');
         
-        // Remove Discord role from all participants
         const guild = interaction.guild;
         const role = guild.roles.cache.get(raid.main_role_id);
         
@@ -65,7 +361,6 @@ async function handleAdminSelect(interaction) {
           }
         }
 
-        // Delete the raid message
         try {
           const channel = await interaction.client.channels.fetch(raid.channel_id);
           const message = await channel.messages.fetch(raid.message_id);
@@ -83,7 +378,6 @@ async function handleAdminSelect(interaction) {
       case 'cancel':
         await updateRaidStatus(raidId, 'cancelled');
         
-        // Remove Discord role
         const guildCancel = interaction.guild;
         const roleCancel = guildCancel.roles.cache.get(raid.main_role_id);
         
@@ -98,7 +392,6 @@ async function handleAdminSelect(interaction) {
           }
         }
 
-        // Delete the raid message
         try {
           const channel = await interaction.client.channels.fetch(raid.channel_id);
           const message = await channel.messages.fetch(raid.message_id);
@@ -114,7 +407,6 @@ async function handleAdminSelect(interaction) {
         break;
 
       case 'repost':
-        // Repost the raid embed
         const channel = await interaction.client.channels.fetch(raid.channel_id);
         const registrations = await getRaidRegistrations(raidId);
         const embed = createRaidEmbed(raid, registrations);
@@ -125,7 +417,6 @@ async function handleAdminSelect(interaction) {
           components: [buttons]
         });
 
-        // Update message_id in database
         await updateRaidMessageId(raidId, newMessage.id);
 
         await interaction.editReply({
@@ -221,21 +512,9 @@ async function handleRegistration(interaction, raidId, registrationType) {
     }
 
     options.push({
-      label: 'Tank (My Character is not listed)',
-      value: `manual_tank_${registrationType}`,
-      emoji: '🛡️'
-    });
-
-    options.push({
-      label: 'DPS (My Character is not listed)',
-      value: `manual_dps_${registrationType}`,
-      emoji: '⚔️'
-    });
-
-    options.push({
-      label: 'Support (My Character is not listed)',
-      value: `manual_support_${registrationType}`,
-      emoji: '💚'
+      label: 'My Character is not listed',
+      value: `manual_entry_${registrationType}`,
+      emoji: '📝'
     });
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -260,28 +539,40 @@ async function handleCharacterSelect(interaction) {
   const [, , raidId, registrationType] = interaction.customId.split('_');
   const selection = interaction.values[0];
 
-  await interaction.deferReply({ flags: 64 });
+  await interaction.deferUpdate();
 
   try {
     const raid = await getRaid(parseInt(raidId));
     if (!raid) {
-      return await interaction.editReply({ content: '❌ Raid not found!' });
+      return await interaction.followUp({ content: '❌ Raid not found!', flags: 64 });
     }
 
     if (raid.status !== 'open') {
-      return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
+      return await interaction.followUp({ content: '❌ This raid is no longer open for registration!', flags: 64 });
     }
 
     const existing = await getRegistration(parseInt(raidId), interaction.user.id);
     if (existing) {
-      return await interaction.editReply({ 
-        content: '❌ You are already registered for this raid! Use "Unregister" first if you want to change.' 
+      return await interaction.followUp({ 
+        content: '❌ You are already registered for this raid! Use "Unregister" first if you want to change.', 
+        flags: 64
       });
     }
 
-    if (selection.startsWith('manual_')) {
-      const [, role] = selection.split('_');
-      return await showManualEntryModal(interaction, raidId, registrationType, role);
+    if (selection.startsWith('manual_entry_')) {
+      // Start manual registration flow
+      const button = new ButtonBuilder()
+        .setCustomId(`manual_class_${raidId}_${registrationType}`)
+        .setLabel('Start Manual Entry')
+        .setStyle(ButtonStyle.Primary);
+
+      const row = new ActionRowBuilder().addComponents(button);
+
+      await interaction.editReply({
+        content: '**Manual Registration Flow:**\n1️⃣ Select Class\n2️⃣ Select Subclass\n3️⃣ Select Ability Score\n4️⃣ Enter IGN\n\nClick below to begin:',
+        components: [row]
+      });
+      return;
     }
 
     if (selection.startsWith('char_')) {
@@ -290,7 +581,7 @@ async function handleCharacterSelect(interaction) {
       const character = characters.find(c => c.id === charId);
 
       if (!character) {
-        return await interaction.editReply({ 
+        return await interaction.followUp({ 
           content: '❌ Character not found! Please try again or use manual entry.', 
           flags: 64
         });
@@ -312,93 +603,6 @@ async function handleCharacterSelect(interaction) {
         flags: 64
       });
     }
-  }
-}
-
-async function showManualEntryModal(interaction, raidId, registrationType, role) {
-  const modal = new ModalBuilder()
-    .setCustomId(`manual_modal_${raidId}_${registrationType}_${role}`)
-    .setTitle(`Manual ${role.charAt(0).toUpperCase() + role.slice(1)} Registration`);
-
-  const ignInput = new TextInputBuilder()
-    .setCustomId('ign')
-    .setLabel('In-Game Name')
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true);
-
-  const classInput = new TextInputBuilder()
-    .setCustomId('class')
-    .setLabel('Class')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g., Storm Blade, Heavy Guardian')
-    .setRequired(true);
-
-  const subclassInput = new TextInputBuilder()
-    .setCustomId('subclass')
-    .setLabel('Subclass')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g., Iaido, Fortress')
-    .setRequired(true);
-
-  const powerInput = new TextInputBuilder()
-    .setCustomId('power')
-    .setLabel('Power Range')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g., 28-30k, 36-38k, 38k+')
-    .setRequired(true);
-
-  const rows = [ignInput, classInput, subclassInput, powerInput].map(input =>
-    new ActionRowBuilder().addComponents(input)
-  );
-
-  modal.addComponents(...rows);
-
-  await interaction.showModal(modal);
-}
-
-async function handleManualModal(interaction) {
-  const [, , raidId, registrationType, role] = interaction.customId.split('_');
-
-  await interaction.deferReply({ flags: 64 });
-
-  try {
-    const raid = await getRaid(parseInt(raidId));
-    if (!raid) {
-      return await interaction.editReply({ content: '❌ Raid not found!' });
-    }
-
-    const ign = interaction.fields.getTextInputValue('ign');
-    const className = interaction.fields.getTextInputValue('class');
-    const subclass = interaction.fields.getTextInputValue('subclass');
-    const powerInput = interaction.fields.getTextInputValue('power');
-
-    let abilityScore;
-    if (powerInput === '38k+') {
-      abilityScore = 38000;
-    } else {
-      const match = powerInput.match(/(\d+)-(\d+)k/);
-      if (match) {
-        abilityScore = parseInt(match[1]) * 1000;
-      } else {
-        return await interaction.editReply({ 
-          content: '❌ Invalid power format! Use formats like: 28-30k, 36-38k, or 38k+' 
-        });
-      }
-    }
-
-    const character = {
-      id: null,
-      ign,
-      class: className,
-      subclass,
-      ability_score: abilityScore
-    };
-
-    await processRegistration(interaction, raid, character, registrationType, 'manual');
-
-  } catch (error) {
-    console.error('Manual modal error:', error);
-    await interaction.editReply({ content: '❌ An error occurred. Please try again.' });
   }
 }
 
@@ -447,7 +651,11 @@ async function processRegistration(interaction, raid, character, registrationTyp
   if (status === 'waitlist') message = '✅ Added to waitlist!';
   if (status === 'assist') message = '✅ Marked as assist!';
 
-  await interaction.editReply({ content: message });
+  if (interaction.deferred) {
+    await interaction.followUp({ content: message, flags: 64 });
+  } else {
+    await interaction.editReply({ content: message });
+  }
 }
 
 async function handleUnregister(interaction, raidId) {
@@ -469,7 +677,6 @@ async function handleUnregister(interaction, raidId) {
 
     await deleteRegistration(raidId, interaction.user.id);
 
-    // Remove Discord role
     try {
       const member = await interaction.guild.members.fetch(interaction.user.id);
       await member.roles.remove(raid.main_role_id);
@@ -534,5 +741,10 @@ async function updateRaidMessage(raid, client) {
 module.exports = {
   handleButton,
   handleCharacterSelect,
-  handleManualModal
+  handleManualClassSelect,
+  handleManualSubclassSelect,
+  handleManualScoreSelect,
+  handleManualIGNModal,
+  handleManualBackToClass,
+  handleManualBackToSubclass
 };
