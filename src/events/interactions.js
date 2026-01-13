@@ -1,48 +1,160 @@
+const { StringSelectMenuBuilder, ActionRowBuilder, ModalBuilder, TextInputBuilder, TextInputStyle } = require('discord.js');
 const { 
-  ActionRowBuilder, 
-  StringSelectMenuBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle
-} = require('discord.js');
-const {
-  getRaid,
+  getRaid, 
+  getRegistration, 
+  deleteRegistration, 
   getUserCharacters,
-  getRegistration,
-  createRegistration,
-  deleteRegistration,
   getRaidRegistrations,
   getRaidCounts,
-  findNextWaitlistPlayer,
+  createRegistration,
   updateRegistrationStatus,
-  getConfig
+  findNextWaitlistPlayer,
+  updateRaidStatus,
+  updateRaidMessageId
 } = require('../database/queries');
-const { 
-  inferRole, 
-  getRoleEmoji, 
-  getClassEmoji,
-  isRaidFull, 
-  isRoleFull,
-  allClasses,
-  allSubclasses,
-  powerRanges,
-  parsePowerRange
-} = require('../utils/helpers');
-const { createRaidEmbed } = require('../utils/embeds');
+const { getClassEmoji, inferRole } = require('../utils/formatters');
+const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
 
 async function handleButton(interaction) {
-  const [action, type, raidId] = interaction.customId.split('_');
+  const [action, raidId] = interaction.customId.split('_');
 
-  if (action === 'raid') {
-    if (type === 'register' || type === 'assist') {
-      await handleRegistration(interaction, parseInt(raidId), type);
-    } else if (type === 'unregister') {
-      await handleUnregister(interaction, parseInt(raidId));
+  // Handle admin dropdown selections
+  if (action === 'admin') {
+    return await handleAdminSelect(interaction);
+  }
+
+  if (action === 'unregister') {
+    return await handleUnregister(interaction, parseInt(raidId));
+  }
+
+  const registrationType = action === 'assist' ? 'assist' : 'register';
+  await handleRegistration(interaction, parseInt(raidId), registrationType);
+}
+
+async function handleAdminSelect(interaction) {
+  await interaction.deferReply({ flags: 64 }); // Ephemeral
+
+  try {
+    const [, subcommand, ] = interaction.customId.split('_');
+    const raidId = parseInt(interaction.values[0]);
+
+    const raid = await getRaid(raidId);
+    if (!raid) {
+      return await interaction.editReply({
+        content: '❌ Raid not found!',
+        components: []
+      });
     }
-  } else if (action === 'char') {
-    await handleCharacterSelect(interaction);
-  } else if (action === 'manual') {
-    await handleManualEntry(interaction);
+
+    switch (subcommand) {
+      case 'complete':
+        await updateRaidStatus(raidId, 'completed');
+        
+        // Remove Discord role from all participants
+        const guild = interaction.guild;
+        const role = guild.roles.cache.get(raid.main_role_id);
+        
+        if (role) {
+          const members = role.members;
+          for (const [memberId, member] of members) {
+            try {
+              await member.roles.remove(role);
+            } catch (err) {
+              console.error(`Failed to remove role from ${memberId}:`, err);
+            }
+          }
+        }
+
+        // Delete the raid message
+        try {
+          const channel = await interaction.client.channels.fetch(raid.channel_id);
+          const message = await channel.messages.fetch(raid.message_id);
+          await message.delete();
+        } catch (err) {
+          console.error('Failed to delete raid message:', err);
+        }
+
+        await interaction.editReply({
+          content: `✅ Raid "${raid.name}" has been completed and removed!`,
+          components: []
+        });
+        break;
+
+      case 'cancel':
+        await updateRaidStatus(raidId, 'cancelled');
+        
+        // Remove Discord role
+        const guildCancel = interaction.guild;
+        const roleCancel = guildCancel.roles.cache.get(raid.main_role_id);
+        
+        if (roleCancel) {
+          const members = roleCancel.members;
+          for (const [memberId, member] of members) {
+            try {
+              await member.roles.remove(roleCancel);
+            } catch (err) {
+              console.error(`Failed to remove role from ${memberId}:`, err);
+            }
+          }
+        }
+
+        // Delete the raid message
+        try {
+          const channel = await interaction.client.channels.fetch(raid.channel_id);
+          const message = await channel.messages.fetch(raid.message_id);
+          await message.delete();
+        } catch (err) {
+          console.error('Failed to delete raid message:', err);
+        }
+
+        await interaction.editReply({
+          content: `✅ Raid "${raid.name}" has been cancelled and removed!`,
+          components: []
+        });
+        break;
+
+      case 'repost':
+        // Repost the raid embed
+        const channel = await interaction.client.channels.fetch(raid.channel_id);
+        const registrations = await getRaidRegistrations(raidId);
+        const embed = createRaidEmbed(raid, registrations);
+        const buttons = createRaidButtons(raidId);
+
+        const newMessage = await channel.send({
+          embeds: [embed],
+          components: [buttons]
+        });
+
+        // Update message_id in database
+        await updateRaidMessageId(raidId, newMessage.id);
+
+        await interaction.editReply({
+          content: `✅ Raid "${raid.name}" has been reposted!`,
+          components: []
+        });
+        break;
+
+      case 'refresh':
+        await updateRaidMessage(raid, interaction.client);
+        await interaction.editReply({
+          content: `✅ Raid "${raid.name}" has been refreshed!`,
+          components: []
+        });
+        break;
+
+      default:
+        await interaction.editReply({
+          content: '❌ Unknown admin action!',
+          components: []
+        });
+    }
+
+  } catch (error) {
+    console.error('Admin action error:', error);
+    await interaction.editReply({
+      content: '❌ An error occurred!',
+      components: []
+    });
   }
 }
 
@@ -148,39 +260,38 @@ async function handleCharacterSelect(interaction) {
   const [, , raidId, registrationType] = interaction.customId.split('_');
   const selection = interaction.values[0];
 
+  await interaction.deferReply({ flags: 64 });
+
   try {
     const raid = await getRaid(parseInt(raidId));
     if (!raid) {
-      return await interaction.reply({ 
-        content: '❌ Raid not found!', 
-        flags: 64
-      });
+      return await interaction.editReply({ content: '❌ Raid not found!' });
+    }
+
+    if (raid.status !== 'open') {
+      return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
     }
 
     const existing = await getRegistration(parseInt(raidId), interaction.user.id);
     if (existing) {
-      return await interaction.reply({ 
-        content: '❌ You are already registered for this raid!', 
-        flags: 64
+      return await interaction.editReply({ 
+        content: '❌ You are already registered for this raid! Use "Unregister" first if you want to change.' 
       });
     }
 
     if (selection.startsWith('manual_')) {
       const [, role] = selection.split('_');
-      await showManualEntryModal(interaction, parseInt(raidId), registrationType, role);
-      return;
+      return await showManualEntryModal(interaction, raidId, registrationType, role);
     }
 
     if (selection.startsWith('char_')) {
-      await interaction.deferUpdate();
-      
-      const characterId = parseInt(selection.split('_')[1]);
-      const { getCharacterById } = require('../database/queries');
-      const character = await getCharacterById(characterId);
+      const charId = parseInt(selection.split('_')[1]);
+      const characters = await getUserCharacters(interaction.user.id);
+      const character = characters.find(c => c.id === charId);
 
       if (!character) {
-        return await interaction.followUp({ 
-          content: '❌ Character not found!', 
+        return await interaction.editReply({ 
+          content: '❌ Character not found! Please try again or use manual entry.', 
           flags: 64
         });
       }
@@ -270,21 +381,20 @@ async function handleManualModal(interaction) {
         abilityScore = parseInt(match[1]) * 1000;
       } else {
         return await interaction.editReply({ 
-          content: '❌ Invalid power format! Use format like "28-30k" or "38k+"' 
+          content: '❌ Invalid power format! Use formats like: 28-30k, 36-38k, or 38k+' 
         });
       }
     }
 
-    const characterData = {
+    const character = {
       id: null,
       ign,
       class: className,
       subclass,
-      ability_score: abilityScore,
-      role: role.charAt(0).toUpperCase() + role.slice(1)
+      ability_score: abilityScore
     };
 
-    await processRegistration(interaction, raid, characterData, registrationType, 'manual');
+    await processRegistration(interaction, raid, character, registrationType, 'manual');
 
   } catch (error) {
     console.error('Manual modal error:', error);
@@ -293,48 +403,51 @@ async function handleManualModal(interaction) {
 }
 
 async function processRegistration(interaction, raid, character, registrationType, source) {
-  try {
-    const counts = await getRaidCounts(raid.id);
-    const role = inferRole(character.class);
+  const role = inferRole(character.class);
+  const counts = await getRaidCounts(raid.id);
 
-    let status;
-    if (isRaidFull(counts, raid.raid_size) || isRoleFull(role, counts, raid)) {
-      status = 'waitlist';
-    } else {
-      status = 'registered';
-    }
+  const totalRegistered = counts.total_registered;
+  const roleFull = counts[role].registered >= raid[`${role.toLowerCase()}_slots`];
+  const raidFull = totalRegistered >= raid.raid_size;
 
-    await createRegistration({
-      raid_id: raid.id,
-      user_id: interaction.user.id,
-      character_id: character.id,
-      character_source: source,
-      ign: character.ign,
-      class: character.class,
-      subclass: character.subclass,
-      ability_score: character.ability_score,
-      role: role,
-      registration_type: registrationType,
-      status: status
-    });
-
-    if (status === 'registered') {
-      const raidRole = await interaction.guild.roles.fetch(raid.main_role_id);
-      await interaction.member.roles.add(raidRole);
-    }
-
-    await updateRaidMessage(raid, interaction.client);
-
-    const message = status === 'registered'
-      ? `✅ You're registered for the raid! You now have the <@&${raid.main_role_id}> role.`
-      : `✅ The raid/role is full. You've been added to the waitlist. You'll be notified if a spot opens!`;
-
-    await interaction.editReply({ content: message });
-
-  } catch (error) {
-    console.error('Process registration error:', error);
-    throw error;
+  let status;
+  if (registrationType === 'assist') {
+    status = 'assist';
+  } else if (roleFull || raidFull) {
+    status = 'waitlist';
+  } else {
+    status = 'registered';
   }
+
+  await createRegistration({
+    raid_id: raid.id,
+    user_id: interaction.user.id,
+    character_id: character.id,
+    ign: character.ign,
+    class: character.class,
+    subclass: character.subclass,
+    ability_score: character.ability_score,
+    role,
+    registration_type: registrationType,
+    status
+  });
+
+  if (status === 'registered') {
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      await member.roles.add(raid.main_role_id);
+    } catch (err) {
+      console.error('Failed to add role:', err);
+    }
+  }
+
+  await updateRaidMessage(raid, interaction.client);
+
+  let message = '✅ Successfully registered!';
+  if (status === 'waitlist') message = '✅ Added to waitlist!';
+  if (status === 'assist') message = '✅ Marked as assist!';
+
+  await interaction.editReply({ content: message });
 }
 
 async function handleUnregister(interaction, raidId) {
@@ -351,22 +464,27 @@ async function handleUnregister(interaction, raidId) {
       return await interaction.editReply({ content: '❌ You are not registered for this raid!' });
     }
 
-    const wasInMainRoster = (registration.status === 'registered');
-
-    if (wasInMainRoster) {
-      const raidRole = await interaction.guild.roles.fetch(raid.main_role_id);
-      await interaction.member.roles.remove(raidRole);
-    }
+    const wasRegistered = registration.status === 'registered';
+    const userRole = registration.role;
 
     await deleteRegistration(raidId, interaction.user.id);
 
-    if (wasInMainRoster) {
-      await promoteFromWaitlist(raid, registration.role, interaction.channel);
+    // Remove Discord role
+    try {
+      const member = await interaction.guild.members.fetch(interaction.user.id);
+      await member.roles.remove(raid.main_role_id);
+    } catch (err) {
+      console.error('Failed to remove role:', err);
+    }
+
+    if (wasRegistered) {
+      const channel = await interaction.client.channels.fetch(raid.channel_id);
+      await promoteFromWaitlist(raid, userRole, channel);
     }
 
     await updateRaidMessage(raid, interaction.client);
 
-    await interaction.editReply({ content: '✅ You have been unregistered from the raid.' });
+    await interaction.editReply({ content: '✅ You have been unregistered!' });
 
   } catch (error) {
     console.error('Unregister error:', error);
@@ -375,21 +493,20 @@ async function handleUnregister(interaction, raidId) {
 }
 
 async function promoteFromWaitlist(raid, role, channel) {
-  const promoted = await findNextWaitlistPlayer(raid.id, role, 'register');
-
-  if (!promoted) return;
-
   try {
+    const registrationType = 'register';
+    const nextPlayer = await findNextWaitlistPlayer(raid.id, role, registrationType);
+
+    if (!nextPlayer) return;
+
+    await updateRegistrationStatus(nextPlayer.id, 'registered');
+
     const guild = channel.guild;
-    const member = await guild.members.fetch(promoted.user_id);
-    const raidRole = await guild.roles.fetch(raid.main_role_id);
-
-    await member.roles.add(raidRole);
-
-    await updateRegistrationStatus(promoted.id, 'registered');
+    const member = await guild.members.fetch(nextPlayer.user_id);
+    await member.roles.add(raid.main_role_id);
 
     await channel.send(
-      `<@${promoted.user_id}> you've been promoted from the waitlist! You're now in the raid! 🎉`
+      `<@${nextPlayer.user_id}> you've been promoted from the waitlist! You're now in the raid! 🎉`
     );
 
   } catch (error) {
@@ -402,13 +519,13 @@ async function updateRaidMessage(raid, client) {
     if (!raid.message_id || !raid.channel_id) return;
 
     const registrations = await getRaidRegistrations(raid.id);
-    const counts = await getRaidCounts(raid.id);
-    const embed = await createRaidEmbed(raid, registrations, counts);
+    const embed = createRaidEmbed(raid, registrations);
+    const buttons = createRaidButtons(raid.id);
 
     const channel = await client.channels.fetch(raid.channel_id);
     const message = await channel.messages.fetch(raid.message_id);
 
-    await message.edit({ embeds: [embed] });
+    await message.edit({ embeds: [embed], components: [buttons] });
   } catch (error) {
     console.error('Update raid message error:', error);
   }
@@ -416,5 +533,6 @@ async function updateRaidMessage(raid, client) {
 
 module.exports = {
   handleButton,
+  handleCharacterSelect,
   handleManualModal
 };
