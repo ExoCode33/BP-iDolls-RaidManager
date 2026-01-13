@@ -20,6 +20,7 @@ const {
 const { 
   inferRole, 
   getRoleEmoji, 
+  getClassEmoji,
   isRaidFull, 
   isRoleFull,
   allClasses,
@@ -58,7 +59,6 @@ async function handleRegistration(interaction, raidId, registrationType) {
       return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
     }
 
-    // Check if already registered
     const existing = await getRegistration(raidId, interaction.user.id);
     if (existing) {
       return await interaction.editReply({ 
@@ -66,25 +66,39 @@ async function handleRegistration(interaction, raidId, registrationType) {
       });
     }
 
-    // Get user's characters from main bot
     const characters = await getUserCharacters(interaction.user.id);
 
-    // Build select menu options
     const options = [];
 
-    // Add user's characters
     for (const char of characters) {
       const role = inferRole(char.class);
-      const emoji = getRoleEmoji(role);
+      
+      let typeLabel = char.character_type;
+      if (typeLabel === 'main_subclass') {
+        typeLabel = 'Subclass';
+      }
+      
+      const classEmojiRaw = getClassEmoji(char.class);
+      let emojiObj = undefined;
+      
+      if (classEmojiRaw) {
+        const match = classEmojiRaw.match(/<:(\w+):(\d+)>/);
+        if (match) {
+          emojiObj = {
+            name: match[1],
+            id: match[2]
+          };
+        }
+      }
+      
       options.push({
-        label: `${char.ign} - ${char.class} (${char.character_type})`,
+        label: `${char.ign} - ${char.class} (${typeLabel})`,
         value: `char_${char.id}`,
         description: `${char.subclass} - ${role}`,
-        emoji: emoji
+        emoji: emojiObj
       });
     }
 
-    // Add manual entry options
     if (options.length > 0) {
       options.push({
         label: '─────────────────────────────',
@@ -112,11 +126,10 @@ async function handleRegistration(interaction, raidId, registrationType) {
       emoji: '💚'
     });
 
-    // Create select menu
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`char_select_${raidId}_${registrationType}`)
       .setPlaceholder('Choose your character or manual entry')
-      .addOptions(options.slice(0, 25)); // Discord limit
+      .addOptions(options.slice(0, 25));
 
     const row = new ActionRowBuilder().addComponents(selectMenu);
 
@@ -146,14 +159,12 @@ async function handleCharacterSelect(interaction) {
       });
     }
 
-    // Handle manual entry
     if (selection.startsWith('manual_')) {
       const [, role] = selection.split('_');
       await showManualEntryModal(interaction, parseInt(raidId), registrationType, role);
       return;
     }
 
-    // Handle character selection
     if (selection.startsWith('char_')) {
       const characterId = parseInt(selection.split('_')[1]);
       const { getCharacterById } = require('../database/queries');
@@ -235,7 +246,6 @@ async function handleManualModal(interaction) {
     const subclass = interaction.fields.getTextInputValue('subclass');
     const powerInput = interaction.fields.getTextInputValue('power');
 
-    // Parse power range
     let abilityScore;
     if (powerInput === '38k+') {
       abilityScore = 38000;
@@ -279,7 +289,6 @@ async function processRegistration(interaction, raid, character, registrationTyp
       status = 'registered';
     }
 
-    // Create registration
     await createRegistration({
       raid_id: raid.id,
       user_id: interaction.user.id,
@@ -294,16 +303,13 @@ async function processRegistration(interaction, raid, character, registrationTyp
       status: status
     });
 
-    // Add role if registered (not waitlisted)
     if (status === 'registered') {
       const raidRole = await interaction.guild.roles.fetch(raid.main_role_id);
       await interaction.member.roles.add(raidRole);
     }
 
-    // Update embed
     await updateRaidMessage(raid, interaction.client);
 
-    // Send confirmation
     const message = status === 'registered'
       ? `✅ You're registered for the raid! You now have the <@&${raid.main_role_id}> role.`
       : `✅ The raid/role is full. You've been added to the waitlist. You'll be notified if a spot opens!`;
@@ -332,21 +338,17 @@ async function handleUnregister(interaction, raidId) {
 
     const wasInMainRoster = (registration.status === 'registered');
 
-    // Remove role if they had it
     if (wasInMainRoster) {
       const raidRole = await interaction.guild.roles.fetch(raid.main_role_id);
       await interaction.member.roles.remove(raidRole);
     }
 
-    // Delete registration
     await deleteRegistration(raidId, interaction.user.id);
 
-    // If they were in main roster, promote someone from waitlist
     if (wasInMainRoster) {
       await promoteFromWaitlist(raid, registration.role, interaction.channel);
     }
 
-    // Update embed
     await updateRaidMessage(raid, interaction.client);
 
     await interaction.editReply({ content: '✅ You have been unregistered from the raid.' });
@@ -358,7 +360,6 @@ async function handleUnregister(interaction, raidId) {
 }
 
 async function promoteFromWaitlist(raid, role, channel) {
-  // Find next person to promote (Register > Assist priority)
   const promoted = await findNextWaitlistPlayer(raid.id, role, 'register');
 
   if (!promoted) return;
@@ -368,13 +369,10 @@ async function promoteFromWaitlist(raid, role, channel) {
     const member = await guild.members.fetch(promoted.user_id);
     const raidRole = await guild.roles.fetch(raid.main_role_id);
 
-    // Add role
     await member.roles.add(raidRole);
 
-    // Update status
     await updateRegistrationStatus(promoted.id, 'registered');
 
-    // Ping in channel
     await channel.send(
       `<@${promoted.user_id}> you've been promoted from the waitlist! You're now in the raid! 🎉`
     );
