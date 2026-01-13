@@ -1,11 +1,18 @@
 const classEmojis = {
+  'Beat Performer': '<:BeatPerformer:1460272597538181254>',
   'BeatPerformer': '<:BeatPerformer:1460272597538181254>',
+  'Frost Mage': '<:FrostMage:1460272596523159695>',
   'FrostMage': '<:FrostMage:1460272596523159695>',
+  'Heavy Guardian': '<:HeavyGuardian:1460272595264995458>',
   'HeavyGuardian': '<:HeavyGuardian:1460272595264995458>',
   'Marksman': '<:Marksman:1460272594275012671>',
+  'Shield Knight': '<:ShieldKnight:1460272593306255465>',
   'ShieldKnight': '<:ShieldKnight:1460272593306255465>',
+  'Storm Blade': '<:StormBlade:1460272591473348618>',
   'StormBlade': '<:StormBlade:1460272591473348618>',
+  'Verdant Oracle': '<:VerdantOracle:1460272589296504916>',
   'VerdantOracle': '<:VerdantOracle:1460272589296504916>',
+  'Wind Knight': '<:WindKnight:1460272588779913428>',
   'WindKnight': '<:WindKnight:1460272588779913428>'
 };
 
@@ -16,13 +23,20 @@ const roleEmojis = {
 };
 
 const classToRole = {
+  'Heavy Guardian': 'Tank',
   'HeavyGuardian': 'Tank',
+  'Shield Knight': 'Tank',
   'ShieldKnight': 'Tank',
+  'Beat Performer': 'Support',
   'BeatPerformer': 'Support',
+  'Verdant Oracle': 'Support',
   'VerdantOracle': 'Support',
+  'Storm Blade': 'DPS',
   'StormBlade': 'DPS',
+  'Frost Mage': 'DPS',
   'FrostMage': 'DPS',
   'Marksman': 'DPS',
+  'Wind Knight': 'DPS',
   'WindKnight': 'DPS'
 };
 
@@ -85,24 +99,31 @@ function chunkArray(array, size) {
 }
 
 const allClasses = [
-  'BeatPerformer',
-  'FrostMage',
-  'HeavyGuardian',
+  'Beat Performer',
+  'Frost Mage',
+  'Heavy Guardian',
   'Marksman',
-  'ShieldKnight',
-  'StormBlade',
-  'VerdantOracle',
-  'WindKnight'
+  'Shield Knight',
+  'Storm Blade',
+  'Verdant Oracle',
+  'Wind Knight'
 ];
 
 const allSubclasses = {
+  'Beat Performer': ['Lifebind', 'Healing Wave', 'Rejuvenation'],
   'BeatPerformer': ['Lifebind', 'Healing Wave', 'Rejuvenation'],
+  'Verdant Oracle': ['Nature\'s Blessing', 'Spirit Link', 'Restoration'],
   'VerdantOracle': ['Nature\'s Blessing', 'Spirit Link', 'Restoration'],
+  'Heavy Guardian': ['Fortress', 'Iron Wall', 'Shield Bash'],
   'HeavyGuardian': ['Fortress', 'Iron Wall', 'Shield Bash'],
+  'Shield Knight': ['Recovery', 'Guardian', 'Defender'],
   'ShieldKnight': ['Recovery', 'Guardian', 'Defender'],
+  'Storm Blade': ['Iaido', 'Lightning Strike', 'Thunder Slash'],
   'StormBlade': ['Iaido', 'Lightning Strike', 'Thunder Slash'],
+  'Frost Mage': ['Ice Storm', 'Blizzard', 'Frozen Orb'],
   'FrostMage': ['Ice Storm', 'Blizzard', 'Frozen Orb'],
   'Marksman': ['Precision', 'Rapid Fire', 'Sniper'],
+  'Wind Knight': ['Tempest', 'Gale Force', 'Hurricane'],
   'WindKnight': ['Tempest', 'Gale Force', 'Hurricane']
 };
 
