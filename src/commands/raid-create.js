@@ -72,10 +72,10 @@ module.exports = {
 
       const result = await eventDB.query(
         `INSERT INTO raids 
-        (name, raid_size, start_time, tank_slots, support_slots, dps_slots, channel_id, main_role_id, raid_slot)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        (name, raid_size, start_time, tank_slots, support_slots, dps_slots, channel_id, main_role_id, raid_slot, created_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *`,
-        [name, size, startTime, slots.tank, slots.support, slots.dps, channel.id, roleId, raidSlot]
+        [name, size, startTime, slots.tank, slots.support, slots.dps, channel.id, roleId, raidSlot, interaction.user.id]
       );
 
       const raid = result.rows[0];
