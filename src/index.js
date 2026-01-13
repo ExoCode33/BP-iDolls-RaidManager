@@ -26,10 +26,91 @@ for (const file of commandFiles) {
   }
 }
 
+// Run migrations automatically
+async function runMigrations() {
+  console.log('🔄 Running database migrations...');
+  try {
+    const { eventDB } = require('./database/connection');
+    
+    const schema = `
+-- Bot configuration table
+CREATE TABLE IF NOT EXISTS bot_config (
+  key VARCHAR(50) PRIMARY KEY,
+  value VARCHAR(200) NOT NULL,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Raids table
+CREATE TABLE IF NOT EXISTS raids (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  raid_size INTEGER NOT NULL CHECK (raid_size IN (12, 20)),
+  start_time TIMESTAMP NOT NULL,
+  
+  tank_slots INTEGER NOT NULL,
+  support_slots INTEGER NOT NULL,
+  dps_slots INTEGER NOT NULL,
+  
+  message_id VARCHAR(20),
+  channel_id VARCHAR(20) NOT NULL,
+  main_role_id VARCHAR(20) NOT NULL,
+  raid_slot INTEGER NOT NULL CHECK (raid_slot IN (1, 2)),
+  
+  created_by VARCHAR(20) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
+  reminded_30m BOOLEAN DEFAULT false
+);
+
+CREATE TABLE IF NOT EXISTS raid_registrations (
+  id SERIAL PRIMARY KEY,
+  raid_id INTEGER REFERENCES raids(id) ON DELETE CASCADE,
+  user_id VARCHAR(20) NOT NULL,
+  
+  character_id INTEGER,
+  character_source VARCHAR(20) DEFAULT 'main_bot' CHECK (character_source IN ('main_bot', 'manual')),
+  ign VARCHAR(100) NOT NULL,
+  class VARCHAR(50) NOT NULL,
+  subclass VARCHAR(50) NOT NULL,
+  ability_score INTEGER NOT NULL,
+  role VARCHAR(20) NOT NULL CHECK (role IN ('Tank', 'DPS', 'Support')),
+  
+  registration_type VARCHAR(20) DEFAULT 'register' CHECK (registration_type IN ('register', 'assist')),
+  status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist')),
+  registered_at TIMESTAMP DEFAULT NOW(),
+  
+  UNIQUE(raid_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_raids_status ON raids(status);
+CREATE INDEX IF NOT EXISTS idx_raids_slot_status ON raids(raid_slot, status);
+CREATE INDEX IF NOT EXISTS idx_raids_start_time ON raids(start_time);
+CREATE INDEX IF NOT EXISTS idx_reg_raid_id ON raid_registrations(raid_id);
+CREATE INDEX IF NOT EXISTS idx_reg_user_id ON raid_registrations(user_id);
+CREATE INDEX IF NOT EXISTS idx_reg_raid_role_status ON raid_registrations(raid_id, role, status);
+CREATE INDEX IF NOT EXISTS idx_reg_raid_status ON raid_registrations(raid_id, status);
+
+INSERT INTO bot_config (key, value) VALUES 
+  ('raid1_role_id', 'not_set'),
+  ('raid2_role_id', 'not_set')
+ON CONFLICT (key) DO NOTHING;
+    `;
+
+    await eventDB.query(schema);
+    console.log('✅ Database migrations completed');
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+    console.error('Please run: npm run db:migrate');
+  }
+}
+
 // Ready event
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`📊 Serving ${c.guilds.cache.size} guild(s)`);
+  
+  // Run migrations on startup
+  await runMigrations();
   
   // Start reminder scheduler
   startReminderScheduler(client);
