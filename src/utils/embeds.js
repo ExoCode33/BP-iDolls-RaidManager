@@ -1,11 +1,10 @@
 const { EmbedBuilder } = require('discord.js');
-const { getRoleEmoji, formatPlayerLine, getRaidSlotLabel } = require('./helpers');
+const { getRoleEmoji, formatPlayerLine, getRaidSlotLabel, inferRole } = require('./helpers');
 
 async function createRaidEmbed(raid, registrations, counts) {
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidLabel = getRaidSlotLabel(raid.raid_slot);
   
-  // Group registrations by role and status
   const grouped = {
     Tank: { registered: [], waitlist: [] },
     DPS: { registered: [], waitlist: [] },
@@ -13,17 +12,16 @@ async function createRaidEmbed(raid, registrations, counts) {
   };
 
   registrations.forEach(reg => {
-    grouped[reg.role][reg.status].push(reg);
+    const correctRole = inferRole(reg.class);
+    grouped[correctRole][reg.status].push(reg);
   });
 
-  // Build description
-  let description = `━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+  let description = `━━━━━━━━━━━━━━━━━━━━\n`;
   description += `📅 ${raid.name}\n`;
   description += `👥 <@&${raid.main_role_id}> (${raidLabel})\n`;
   description += `🕐 <t:${timestamp}:F>\n`;
   description += `Raid Size: ${raid.raid_size}-Player (${counts.total_registered}/${raid.raid_size})\n\n`;
 
-  // Tank section
   description += `${getRoleEmoji('Tank')} **Tank (${counts.Tank.registered}/${raid.tank_slots})**\n`;
   if (grouped.Tank.registered.length > 0) {
     grouped.Tank.registered.forEach((reg, idx) => {
@@ -35,7 +33,6 @@ async function createRaidEmbed(raid, registrations, counts) {
   }
   description += '\n';
 
-  // Support section
   description += `${getRoleEmoji('Support')} **Support (${counts.Support.registered}/${raid.support_slots})**\n`;
   if (grouped.Support.registered.length > 0) {
     grouped.Support.registered.forEach((reg, idx) => {
@@ -47,7 +44,6 @@ async function createRaidEmbed(raid, registrations, counts) {
   }
   description += '\n';
 
-  // DPS section
   description += `${getRoleEmoji('DPS')} **DPS (${counts.DPS.registered}/${raid.dps_slots})**\n`;
   if (grouped.DPS.registered.length > 0) {
     grouped.DPS.registered.forEach((reg, idx) => {
@@ -58,7 +54,6 @@ async function createRaidEmbed(raid, registrations, counts) {
     description += `└─ *No DPS yet*\n`;
   }
 
-  // Waitlist section
   const allWaitlist = [
     ...grouped.Tank.waitlist,
     ...grouped.Support.waitlist,
@@ -73,7 +68,7 @@ async function createRaidEmbed(raid, registrations, counts) {
     });
   }
 
-  description += `\n━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+  description += `\n━━━━━━━━━━━━━━━━━━━━`;
 
   const embed = new EmbedBuilder()
     .setDescription(description)
