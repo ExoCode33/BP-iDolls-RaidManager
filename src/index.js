@@ -5,7 +5,6 @@ const path = require('path');
 const { startReminderScheduler } = require('./utils/scheduler');
 const { handleButton, handleManualModal } = require('./events/interactions');
 
-// Create client
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -13,7 +12,6 @@ const client = new Client({
   ]
 });
 
-// Load commands
 client.commands = new Collection();
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
@@ -28,36 +26,30 @@ for (const file of commandFiles) {
   }
 }
 
-// Run migrations automatically
 async function runMigrations() {
   console.log('🔄 Running database migrations...');
   try {
     const { eventDB } = require('./database/connection');
     
     const schema = `
--- Bot configuration table
 CREATE TABLE IF NOT EXISTS bot_config (
   key VARCHAR(50) PRIMARY KEY,
   value VARCHAR(200) NOT NULL,
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Raids table
 CREATE TABLE IF NOT EXISTS raids (
   id SERIAL PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
   raid_size INTEGER NOT NULL CHECK (raid_size IN (12, 20)),
   start_time TIMESTAMP NOT NULL,
-  
   tank_slots INTEGER NOT NULL,
   support_slots INTEGER NOT NULL,
   dps_slots INTEGER NOT NULL,
-  
   message_id VARCHAR(20),
   channel_id VARCHAR(20) NOT NULL,
   main_role_id VARCHAR(20) NOT NULL,
   raid_slot INTEGER NOT NULL CHECK (raid_slot IN (1, 2)),
-  
   created_by VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
@@ -68,7 +60,6 @@ CREATE TABLE IF NOT EXISTS raid_registrations (
   id SERIAL PRIMARY KEY,
   raid_id INTEGER REFERENCES raids(id) ON DELETE CASCADE,
   user_id VARCHAR(20) NOT NULL,
-  
   character_id INTEGER,
   character_source VARCHAR(20) DEFAULT 'main_bot' CHECK (character_source IN ('main_bot', 'manual')),
   ign VARCHAR(100) NOT NULL,
@@ -76,11 +67,9 @@ CREATE TABLE IF NOT EXISTS raid_registrations (
   subclass VARCHAR(50) NOT NULL,
   ability_score INTEGER NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('Tank', 'DPS', 'Support')),
-  
   registration_type VARCHAR(20) DEFAULT 'register' CHECK (registration_type IN ('register', 'assist')),
   status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist')),
   registered_at TIMESTAMP DEFAULT NOW(),
-  
   UNIQUE(raid_id, user_id)
 );
 
@@ -105,13 +94,11 @@ ON CONFLICT (key) DO NOTHING;
   }
 }
 
-// Deploy commands automatically
 async function deployCommands() {
   console.log(`🔄 Deploying ${commands.length} slash commands...`);
   try {
     const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
-    // Deploy to guild if GUILD_ID provided, otherwise deploy globally
     if (process.env.DISCORD_GUILD_ID) {
       await rest.put(
         Routes.applicationGuildCommands(process.env.DISCORD_CLIENT_ID, process.env.DISCORD_GUILD_ID),
@@ -130,28 +117,21 @@ async function deployCommands() {
   }
 }
 
-// Ready event
 client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`📊 Serving ${c.guilds.cache.size} guild(s)`);
   
-  // Run migrations on startup
   await runMigrations();
-  
-  // Deploy commands on startup
   await deployCommands();
   
-  // Start reminder scheduler
   startReminderScheduler(client);
 });
 
-// Interaction handler
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
       if (!command) return;
-
       await command.execute(interaction);
     } 
     else if (interaction.isButton()) {
@@ -180,7 +160,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// Error handlers
 client.on('error', error => {
   console.error('Client error:', error);
 });
@@ -193,40 +172,4 @@ process.on('unhandledRejection', error => {
   console.error('Unhandled promise rejection:', error);
 });
 
-// Login
 client.login(process.env.DISCORD_TOKEN);
-```
-
----
-
-## What Changed:
-
-✅ **Auto-runs migrations** on startup
-✅ **Auto-deploys commands** on startup
-✅ No manual `npm run deploy` needed
-✅ No manual `npm run db:migrate` needed
-
----
-
-## Now Your Workflow:
-
-1. ✅ Set environment variables in Railway
-2. ✅ Deploy bot
-3. ✅ **Everything happens automatically!**
-   - Database migrations ✅
-   - Command deployment ✅
-   - Bot starts ✅
-4. ✅ Just run `/raid-setup` in Discord
-5. ✅ Start creating raids!
-
----
-
-## Expected Startup Logs:
-```
-✅ Logged in as iDolls Raid Manager#9467
-📊 Serving 1 guild(s)
-🔄 Running database migrations...
-✅ Database migrations completed
-🔄 Deploying 2 slash commands...
-✅ Successfully deployed 2 guild commands
-✅ Reminder scheduler started
