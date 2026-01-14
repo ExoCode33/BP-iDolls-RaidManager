@@ -1,5 +1,6 @@
 const { getRaid, lockRaid, unlockRaid, updateRaidStatus, updateRaidMessageId, getRaidRegistrations, createRaidPost } = require('../../database/queries');
 const { createRaidEmbed, createRaidButtons } = require('../../utils/embeds');
+const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 
 // ═══════════════════════════════════════════════════════════════
 // RAID ACTION HANDLERS
@@ -19,10 +20,7 @@ async function handleRaidAction(interaction) {
     const raid = await getRaid(raidId);
 
     if (!raid) {
-      return await interaction.editReply({
-        content: '❌ Raid not found!',
-        components: []
-      });
+      return await redirectToMainMenu(interaction, '❌ Raid not found!');
     }
 
     switch (action) {
@@ -45,17 +43,11 @@ async function handleRaidAction(interaction) {
         await handleRefresh(interaction, raid);
         break;
       default:
-        await interaction.editReply({
-          content: '❌ Unknown action!',
-          components: []
-        });
+        await redirectToMainMenu(interaction, '❌ Unknown action!');
     }
   } catch (error) {
     console.error('Raid action error:', error);
-    await interaction.editReply({
-      content: '❌ An error occurred!',
-      components: []
-    });
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
 
@@ -78,9 +70,16 @@ async function handleLock(interaction, raid) {
     }
   }
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
   await interaction.editReply({
     content: `✅ Raid "${raid.name}" has been locked!\n\n🔒 Registration is now closed. Only the Unregister button remains.`,
-    components: []
+    components: [row]
   });
 }
 
@@ -103,9 +102,16 @@ async function handleUnlock(interaction, raid) {
     }
   }
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
   await interaction.editReply({
     content: `✅ Raid "${raid.name}" has been unlocked!\n\n🔓 Registration is now open. All buttons are available.`,
-    components: []
+    components: [row]
   });
 }
 
@@ -118,11 +124,9 @@ async function handleComplete(interaction, raid) {
   
   if (role) {
     const members = role.members;
-    let removedCount = 0;
     for (const [memberId, member] of members) {
       try {
         await member.roles.remove(role);
-        removedCount++;
       } catch (err) {
         console.error(`Failed to remove role from ${memberId}:`, err);
       }
@@ -140,9 +144,16 @@ async function handleComplete(interaction, raid) {
     }
   }
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
   await interaction.editReply({
     content: `✅ Raid "${raid.name}" has been completed!\n\n**Cleanup performed:**\n✅ Raid role removed from all participants\n✅ Raid message deleted\n✅ Database updated to 'completed'`,
-    components: []
+    components: [row]
   });
 }
 
@@ -175,9 +186,16 @@ async function handleCancel(interaction, raid) {
     }
   }
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
   await interaction.editReply({
     content: `✅ Raid "${raid.name}" has been cancelled!\n\n**Cleanup performed:**\n✅ Raid role removed from all participants\n✅ Raid message deleted\n✅ Database updated to 'cancelled'`,
-    components: []
+    components: [row]
   });
 }
 
@@ -188,18 +206,22 @@ async function handleRepost(interaction, raid) {
 
   await updateRaidMessageId(raid.id, messageId);
 
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
   await interaction.editReply({
     content: `✅ Raid "${raid.name}" has been reposted!\n\nNew message posted to <#${raid.channel_id}>`,
-    components: []
+    components: [row]
   });
 }
 
 async function handleRefresh(interaction, raid) {
   if (!raid.message_id || !raid.channel_id) {
-    return await interaction.editReply({
-      content: '❌ Raid has not been posted yet!',
-      components: []
-    });
+    return await redirectToMainMenu(interaction, '❌ Raid has not been posted yet!');
   }
 
   try {
@@ -212,17 +234,47 @@ async function handleRefresh(interaction, raid) {
 
     await message.edit({ embeds: [embed], components: [buttons] });
 
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder().addComponents(backButton);
+
     await interaction.editReply({
       content: `✅ Raid "${raid.name}" has been refreshed!`,
-      components: []
+      components: [row]
     });
   } catch (err) {
     console.error('Refresh error:', err);
-    await interaction.editReply({
-      content: '❌ Failed to refresh raid message!',
-      components: []
-    });
+    await redirectToMainMenu(interaction, '❌ Failed to refresh raid message!');
   }
+}
+
+async function redirectToMainMenu(interaction, errorMessage) {
+  const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+  
+  const embed = createMainMenuEmbed();
+  const row = createMainMenuRow(interaction.user.id);
+
+  await interaction.editReply({
+    content: errorMessage,
+    embeds: [embed],
+    components: [row]
+  });
+
+  // Auto-remove error message after 3 seconds
+  setTimeout(async () => {
+    try {
+      await interaction.editReply({
+        content: null,
+        embeds: [embed],
+        components: [row]
+      });
+    } catch (err) {
+      // Ignore if interaction expired
+    }
+  }, 3000);
 }
 
 module.exports = {
