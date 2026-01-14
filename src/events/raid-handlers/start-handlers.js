@@ -1,4 +1,4 @@
-const { StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
+const { StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { getUnpostedRaids, createRaidPost, updateRaidMessageId } = require('../../database/queries');
 
 // ═══════════════════════════════════════════════════════════════
@@ -8,34 +8,41 @@ const { getUnpostedRaids, createRaidPost, updateRaidMessageId } = require('../..
 async function showStartRaidSelector(interaction) {
   await interaction.deferUpdate();
 
-  const raids = await getUnpostedRaids();
+  try {
+    const raids = await getUnpostedRaids();
 
-  if (raids.length === 0) {
-    return await interaction.editReply({
-      content: '❌ No raids available to start!\n\nAll raids are either already posted or there are no raids created.\n\nUse **➕ Create Raid** to create a new raid first.',
+    if (raids.length === 0) {
+      return await redirectToMainMenu(interaction, '❌ No raids available to start!\n\nAll raids are either already posted or there are no raids created.\n\nUse **➕ Create Preset** to create a new raid first.');
+    }
+
+    const options = raids.map(raid => ({
+      label: raid.name,
+      value: raid.id.toString(),
+      description: `${raid.raid_size}-player | ${new Date(raid.start_time).toLocaleString()}`
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`raid_start_select_${interaction.user.id}`)
+      .setPlaceholder('Select a raid to post')
+      .addOptions(options);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: '🚀 **Start Raid:** Select which raid to post to the channel',
       embeds: [],
-      components: []
+      components: [row1, row2]
     });
+  } catch (error) {
+    console.error('Show start selector error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
-
-  const options = raids.map(raid => ({
-    label: raid.name,
-    value: raid.id.toString(),
-    description: `${raid.raid_size}-player | ${new Date(raid.start_time).toLocaleString()}`
-  }));
-
-  const selectMenu = new StringSelectMenuBuilder()
-    .setCustomId(`raid_start_select_${interaction.user.id}`)
-    .setPlaceholder('Select a raid to post')
-    .addOptions(options);
-
-  const row = new ActionRowBuilder().addComponents(selectMenu);
-
-  await interaction.editReply({
-    content: '🚀 **Start Raid:** Select which raid to post to the channel',
-    embeds: [],
-    components: [row]
-  });
 }
 
 async function handleStartSelect(interaction) {
@@ -50,17 +57,11 @@ async function handleStartSelect(interaction) {
     const raid = await getRaid(raidId);
 
     if (!raid) {
-      return await interaction.editReply({
-        content: '❌ Raid not found!',
-        components: []
-      });
+      return await redirectToMainMenu(interaction, '❌ Raid not found!');
     }
 
     if (raid.message_id) {
-      return await interaction.editReply({
-        content: '❌ This raid has already been posted!',
-        components: []
-      });
+      return await redirectToMainMenu(interaction, '❌ This raid has already been posted!');
     }
 
     // Post the raid
@@ -70,18 +71,48 @@ async function handleStartSelect(interaction) {
     // Update database with message ID
     await updateRaidMessageId(raidId, messageId);
 
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Primary);
+
+    const row = new ActionRowBuilder().addComponents(backButton);
+
     await interaction.editReply({
       content: `✅ Raid posted successfully!\n\n**${raid.name}** has been posted to <#${raid.channel_id}>`,
-      components: []
+      components: [row]
     });
 
   } catch (error) {
     console.error('Start raid error:', error);
-    await interaction.editReply({
-      content: '❌ Failed to start raid!',
-      components: []
-    });
+    await redirectToMainMenu(interaction, '❌ Failed to start raid!');
   }
+}
+
+async function redirectToMainMenu(interaction, errorMessage) {
+  const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+  
+  const embed = createMainMenuEmbed();
+  const row = createMainMenuRow(interaction.user.id);
+
+  await interaction.editReply({
+    content: errorMessage,
+    embeds: [embed],
+    components: [row]
+  });
+
+  // Auto-remove error message after 3 seconds
+  setTimeout(async () => {
+    try {
+      await interaction.editReply({
+        content: null,
+        embeds: [embed],
+        components: [row]
+      });
+    } catch (err) {
+      // Ignore if interaction expired
+    }
+  }, 3000);
 }
 
 module.exports = {
