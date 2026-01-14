@@ -1,132 +1,95 @@
-const { EmbedBuilder, StringSelectMenuBuilder, ActionRowBuilder } = require('discord.js');
-const { getActiveRaids } = require('../../database/queries');
+const { EmbedBuilder, StringSelectMenuBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { getActiveRaids, getRaid } = require('../../database/queries');
 
 // ═══════════════════════════════════════════════════════════════
-// MAIN RAID MENU HANDLER
+// MAIN MENU - REDESIGNED WITH BUTTONS AND ORGANIZED DROPDOWNS
 // ═══════════════════════════════════════════════════════════════
 
-function createMainMenuEmbed() {
-  return new EmbedBuilder()
+async function createMainMenuEmbed() {
+  const raids = await getActiveRaids();
+  
+  const embed = new EmbedBuilder()
     .setColor(0xEC4899)
     .setTitle('🎮 Raid Management System')
-    .setDescription('**Professional raid coordination for your guild**\n\n━━━━━━━━━━━━━━━━━━━━━━━━')
-    .addFields(
-      { 
-        name: '\u200B', 
-        value: '**📋 SETUP & CONFIGURATION**', 
-        inline: false 
-      },
-      { 
-        name: '⚙️ Role Setup', 
-        value: 'Configure raid roles', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '\u200B', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '\u200B', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '**📝 PRESET MANAGEMENT**', 
-        inline: false 
-      },
-      { 
-        name: '➕ Create', 
-        value: 'New template', 
-        inline: true 
-      },
-      { 
-        name: '✏️ Edit', 
-        value: 'Modify existing', 
-        inline: true 
-      },
-      { 
-        name: '🗑️ Delete', 
-        value: 'Remove preset', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '**🚀 RAID OPERATIONS**', 
-        inline: false 
-      },
-      { 
-        name: '📋 View Raids', 
-        value: 'List all active', 
-        inline: true 
-      },
-      { 
-        name: '🎯 Start Raid', 
-        value: 'Post to channel', 
-        inline: true 
-      },
-      { 
-        name: '🔄 Refresh', 
-        value: 'Update embed', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '**⚡ QUICK ACTIONS**', 
-        inline: false 
-      },
-      { 
-        name: '🔒 Lock', 
-        value: 'Stop signups', 
-        inline: true 
-      },
-      { 
-        name: '🔓 Unlock', 
-        value: 'Allow signups', 
-        inline: true 
-      },
-      { 
-        name: '✅ Complete', 
-        value: 'Finish raid', 
-        inline: true 
-      },
-      { 
-        name: '❌ Cancel', 
-        value: 'Cancel raid', 
-        inline: true 
-      },
-      { 
-        name: '📝 Repost', 
-        value: 'Restore embed', 
-        inline: true 
-      },
-      { 
-        name: '\u200B', 
-        value: '\u200B', 
-        inline: true 
-      }
-    )
-    .setFooter({ text: 'All actions are private • Select an option below' });
+    .setDescription('**Professional raid coordination for your guild**\n\n━━━━━━━━━━━━━━━━━━━━━━━━');
+
+  // Always show active raids
+  if (raids.length === 0) {
+    embed.addFields({
+      name: '📋 Active Raids',
+      value: '*No active raids*',
+      inline: false
+    });
+  } else {
+    let raidsList = '';
+    for (const raid of raids) {
+      const startTime = Math.floor(new Date(raid.start_time).getTime() / 1000);
+      const status = raid.locked ? '🔒' : '🔓';
+      const posted = raid.message_id ? '✅' : '⏳';
+      raidsList += `${status} ${posted} **${raid.name}** - ${raid.raid_size}p - <t:${startTime}:F>\n`;
+    }
+    embed.addFields({
+      name: '📋 Active Raids',
+      value: raidsList,
+      inline: false
+    });
+  }
+
+  embed.addFields(
+    { name: '\u200B', value: '━━━━━━━━━━━━━━━━━━━━━━━━', inline: false },
+    { 
+      name: '🎯 Quick Actions', 
+      value: 'Use buttons above to start, complete, or edit raids\n' +
+             'Use dropdowns below for configuration and management', 
+      inline: false 
+    }
+  );
+
+  embed.setFooter({ text: '🔒 = Locked | 🔓 = Open | ✅ = Posted | ⏳ = Not Posted' });
+  
+  return embed;
 }
 
-function createMainMenuRow(userId) {
-  const mainMenu = new StringSelectMenuBuilder()
-    .setCustomId(`raid_main_menu_${userId}`)
-    .setPlaceholder('🎮 Select an action')
+function createMainMenuButtons(userId) {
+  const startButton = new ButtonBuilder()
+    .setCustomId(`raid_quick_start_${userId}`)
+    .setLabel('🚀 Start Raid')
+    .setStyle(ButtonStyle.Success);
+
+  const completeButton = new ButtonBuilder()
+    .setCustomId(`raid_quick_complete_${userId}`)
+    .setLabel('✅ Complete Raid')
+    .setStyle(ButtonStyle.Primary);
+
+  const editButton = new ButtonBuilder()
+    .setCustomId(`raid_quick_edit_${userId}`)
+    .setLabel('✏️ Edit Raid')
+    .setStyle(ButtonStyle.Secondary);
+
+  return new ActionRowBuilder().addComponents(startButton, completeButton, editButton);
+}
+
+function createRoleConfigDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_role_config_${userId}`)
+    .setPlaceholder('⚙️ Role Configuration')
     .addOptions([
       {
-        label: '⚙️ Role Setup',
+        label: '⚙️ Configure Raid Roles',
         value: 'setup',
-        description: 'Configure Raid 1 & Raid 2 roles',
+        description: 'Set Raid 1 and Raid 2 role IDs',
         emoji: '⚙️'
-      },
-      {
-        label: '─────────────────────',
-        value: 'separator1',
-        description: 'PRESET MANAGEMENT',
-        emoji: '📝'
-      },
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
+function createPresetDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_preset_menu_${userId}`)
+    .setPlaceholder('📝 Preset Management')
+    .addOptions([
       {
         label: '➕ Create Preset',
         value: 'create',
@@ -144,60 +107,54 @@ function createMainMenuRow(userId) {
         value: 'delete',
         description: 'Remove a preset',
         emoji: '🗑️'
-      },
-      {
-        label: '─────────────────────',
-        value: 'separator2',
-        description: 'RAID OPERATIONS',
-        emoji: '🚀'
-      },
-      {
-        label: '📋 View Active Raids',
-        value: 'list',
-        description: 'List all active raids',
-        emoji: '📋'
-      },
-      {
-        label: '🎯 Start Raid',
-        value: 'start',
-        description: 'Post a raid to channel',
-        emoji: '🎯'
-      },
-      {
-        label: '🔄 Refresh Embed',
-        value: 'refresh',
-        description: 'Update raid display',
-        emoji: '🔄'
-      },
-      {
-        label: '─────────────────────',
-        value: 'separator3',
-        description: 'QUICK ACTIONS',
-        emoji: '⚡'
-      },
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
+function createLockDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_lock_menu_${userId}`)
+    .setPlaceholder('🔒 Lock Management')
+    .addOptions([
       {
         label: '🔒 Lock Raid',
         value: 'lock',
-        description: 'Stop new registrations',
+        description: 'Prevent new registrations',
         emoji: '🔒'
-      },
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
+function createUnlockDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_unlock_menu_${userId}`)
+    .setPlaceholder('🔓 Unlock Management')
+    .addOptions([
       {
         label: '🔓 Unlock Raid',
         value: 'unlock',
         description: 'Allow registrations',
         emoji: '🔓'
-      },
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
+function createEmbedDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_embed_menu_${userId}`)
+    .setPlaceholder('📺 Embed Management')
+    .addOptions([
       {
-        label: '✅ Complete Raid',
-        value: 'complete',
-        description: 'Mark raid as completed',
-        emoji: '✅'
-      },
-      {
-        label: '❌ Cancel Raid',
-        value: 'cancel',
-        description: 'Cancel a raid',
-        emoji: '❌'
+        label: '🔄 Refresh Embed',
+        value: 'refresh',
+        description: 'Update raid display',
+        emoji: '🔄'
       },
       {
         label: '📝 Repost Embed',
@@ -207,28 +164,33 @@ function createMainMenuRow(userId) {
       }
     ]);
 
-  return new ActionRowBuilder().addComponents(mainMenu);
+  return new ActionRowBuilder().addComponents(dropdown);
 }
 
-async function handleRaidMainMenu(interaction) {
+// ═══════════════════════════════════════════════════════════════
+// HANDLERS
+// ═══════════════════════════════════════════════════════════════
+
+async function handleRoleConfigMenu(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
   const action = interaction.values[0];
 
-  // Ignore separator selections
-  if (action.startsWith('separator')) {
-    await interaction.deferUpdate();
-    return;
+  if (action === 'setup') {
+    const setupHandlers = require('./setup-handlers');
+    await setupHandlers.showSetupModal(interaction);
   }
+}
+
+async function handlePresetMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  const action = interaction.values[0];
 
   try {
     switch (action) {
-      case 'setup':
-        const setupHandlers = require('./setup-handlers');
-        await setupHandlers.showSetupModal(interaction);
-        break;
-      
       case 'create':
         const createHandlers = require('./create-handlers');
         await createHandlers.startCreateFlow(interaction);
@@ -241,137 +203,99 @@ async function handleRaidMainMenu(interaction) {
       case 'delete':
         await showDeleteSelector(interaction);
         break;
-      
-      case 'start':
-        const startHandlers = require('./start-handlers');
-        await startHandlers.showStartRaidSelector(interaction);
-        break;
-      
-      case 'list':
-        await showRaidList(interaction);
-        break;
-      
-      case 'lock':
-        await showRaidSelector(interaction, 'lock', '🔒 Lock Registration');
-        break;
-      
-      case 'unlock':
-        await showRaidSelector(interaction, 'unlock', '🔓 Unlock Registration');
-        break;
-      
-      case 'complete':
-        await showRaidSelector(interaction, 'complete', '✅ Complete Raid');
-        break;
-      
-      case 'cancel':
-        await showRaidSelector(interaction, 'cancel', '❌ Cancel Raid');
+    }
+  } catch (error) {
+    console.error('Preset menu error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
+  }
+}
+
+async function handleLockMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await showRaidSelector(interaction, 'lock', '🔒 Lock Registration');
+}
+
+async function handleUnlockMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await showRaidSelector(interaction, 'unlock', '🔓 Unlock Registration');
+}
+
+async function handleEmbedMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  const action = interaction.values[0];
+
+  try {
+    switch (action) {
+      case 'refresh':
+        await showRaidSelector(interaction, 'refresh', '🔄 Refresh Embed');
         break;
       
       case 'repost':
         await showRaidSelector(interaction, 'repost', '📝 Repost Embed');
         break;
-      
-      case 'refresh':
-        await showRaidSelector(interaction, 'refresh', '🔄 Refresh Embed');
-        break;
-      
-      default:
-        await redirectToMainMenuWithError(interaction, '❌ Unknown action!');
     }
   } catch (error) {
-    console.error('Raid menu error:', error);
-    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+    console.error('Embed menu error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
 
-async function handleBackToMain(interaction) {
+// Quick action buttons
+async function handleQuickStart(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await interaction.deferUpdate();
+  const startHandlers = require('./start-handlers');
+  await startHandlers.showStartRaidSelector(interaction);
+}
 
-  const embed = createMainMenuEmbed();
-  const row = createMainMenuRow(interaction.user.id);
+async function handleQuickComplete(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
 
-  await interaction.editReply({
-    content: null,
-    embeds: [embed],
-    components: [row]
-  });
+  await showRaidSelector(interaction, 'complete', '✅ Complete Raid');
+}
+
+async function handleQuickEdit(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await showEditRaidSelector(interaction);
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HELPER FUNCTIONS
+// EDIT RAID SELECTOR
 // ═══════════════════════════════════════════════════════════════
 
-async function showRaidList(interaction) {
+async function showEditRaidSelector(interaction) {
   await interaction.deferUpdate();
 
   try {
     const raids = await getActiveRaids();
+    const postedRaids = raids.filter(r => r.message_id);
 
-    if (raids.length === 0) {
-      return await redirectToMainMenuWithError(interaction, '📋 No active raids at the moment.');
+    if (postedRaids.length === 0) {
+      return await redirectToMainMenu(interaction, '❌ No active raids to edit!\n\nOnly posted raids can be edited or cancelled.');
     }
 
-    const embed = new EmbedBuilder()
-      .setColor(0xEC4899)
-      .setTitle('📋 Active Raids')
-      .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━');
-
-    for (const raid of raids) {
-      const startTime = Math.floor(new Date(raid.start_time).getTime() / 1000);
-      const status = raid.locked ? '🔒 Locked' : '🔓 Open';
-      const posted = raid.message_id ? '✅ Posted' : '⏳ Not Posted';
-      
-      embed.addFields({
-        name: `${raid.name}`,
-        value: `**Status:** ${status} | ${posted}\n**Size:** ${raid.raid_size}-player\n**Time:** <t:${startTime}:F>\n**Channel:** <#${raid.channel_id}>`,
-        inline: false
-      });
-    }
-
-    const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
-    const backButton = new ButtonBuilder()
-      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder().addComponents(backButton);
-
-    await interaction.editReply({ 
-      content: null,
-      embeds: [embed], 
-      components: [row] 
-    });
-  } catch (error) {
-    console.error('Show raid list error:', error);
-    await redirectToMainMenuWithError(interaction, '❌ An error occurred while loading raids!');
-  }
-}
-
-async function showRaidSelector(interaction, action, title) {
-  await interaction.deferUpdate();
-
-  try {
-    const raids = await getActiveRaids();
-
-    if (raids.length === 0) {
-      return await redirectToMainMenuWithError(interaction, '❌ No active raids found!');
-    }
-
-    const options = raids.map(raid => ({
+    const options = postedRaids.map(raid => ({
       label: raid.name,
       value: raid.id.toString(),
-      description: `${new Date(raid.start_time).toLocaleString()}`
+      description: `${raid.raid_size}-player | ${new Date(raid.start_time).toLocaleString()}`,
+      emoji: raid.locked ? '🔒' : '🔓'
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId(`raid_action_${action}_${interaction.user.id}`)
-      .setPlaceholder('Select a raid')
+      .setCustomId(`raid_edit_raid_select_${interaction.user.id}`)
+      .setPlaceholder('Select a raid to edit or cancel')
       .addOptions(options);
 
-    const { ButtonBuilder, ButtonStyle } = require('discord.js');
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
       .setLabel('◀️ Back to Main Menu')
@@ -381,47 +305,118 @@ async function showRaidSelector(interaction, action, title) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
-      content: `${title}: Select a raid`,
+      content: '✏️ **Edit Raid:** Select which raid to modify or cancel',
       embeds: [],
       components: [row1, row2]
     });
+
   } catch (error) {
-    console.error('Show raid selector error:', error);
-    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+    console.error('Show edit raid selector error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
 
-async function redirectToMainMenuWithError(interaction, errorMessage) {
-  const embed = createMainMenuEmbed();
-  const row = createMainMenuRow(interaction.user.id);
+async function handleEditRaidSelect(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
 
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.reply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [row],
-      flags: 64
-    });
-  } else {
-    await interaction.editReply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [row]
-    });
-  }
+  await interaction.deferUpdate();
 
-  // Auto-remove error message after 3 seconds
-  setTimeout(async () => {
-    try {
-      await interaction.editReply({
-        content: null,
-        embeds: [embed],
-        components: [row]
-      });
-    } catch (err) {
-      // Ignore if interaction expired
+  try {
+    const raidId = parseInt(interaction.values[0]);
+    const raid = await getRaid(raidId);
+
+    if (!raid) {
+      return await redirectToMainMenu(interaction, '❌ Raid not found!');
     }
-  }, 3000);
+
+    // Show edit options
+    const editNameButton = new ButtonBuilder()
+      .setCustomId(`raid_edit_raid_name_${raidId}_${interaction.user.id}`)
+      .setLabel('📝 Edit Name')
+      .setStyle(ButtonStyle.Secondary);
+
+    const editTimeButton = new ButtonBuilder()
+      .setCustomId(`raid_edit_raid_time_${raidId}_${interaction.user.id}`)
+      .setLabel('🕐 Edit Time')
+      .setStyle(ButtonStyle.Secondary);
+
+    const cancelButton = new ButtonBuilder()
+      .setCustomId(`raid_action_select_cancel_${raidId}_${interaction.user.id}`)
+      .setLabel('❌ Cancel Raid')
+      .setStyle(ButtonStyle.Danger);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Primary);
+
+    const row1 = new ActionRowBuilder().addComponents(editNameButton, editTimeButton, cancelButton);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: `✏️ **Edit: ${raid.name}**\n\n` +
+               `**Current Details:**\n` +
+               `📝 Name: ${raid.name}\n` +
+               `👥 Size: ${raid.raid_size}-player\n` +
+               `🕐 Time: <t:${Math.floor(new Date(raid.start_time).getTime() / 1000)}:F>\n` +
+               `📺 Channel: <#${raid.channel_id}>\n` +
+               `${raid.locked ? '🔒 Locked' : '🔓 Open'}\n\n` +
+               `**What would you like to do?**`,
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Edit raid select error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════
+
+async function showRaidSelector(interaction, action, title) {
+  await interaction.deferUpdate();
+
+  try {
+    const raids = await getActiveRaids();
+    const postedRaids = raids.filter(r => r.message_id);
+
+    if (postedRaids.length === 0) {
+      return await redirectToMainMenu(interaction, `❌ No active raids available for this action!`);
+    }
+
+    const options = postedRaids.map(raid => ({
+      label: raid.name,
+      value: raid.id.toString(),
+      description: `${raid.raid_size}-player raid`,
+      emoji: raid.locked ? '🔒' : '🔓'
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`raid_action_select_${action}_${interaction.user.id}`)
+      .setPlaceholder(`Select a raid`)
+      .addOptions(options);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: `${title}`,
+      embeds: [],
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Show raid selector error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
+  }
 }
 
 async function showEditSelector(interaction) {
@@ -432,7 +427,7 @@ async function showEditSelector(interaction) {
     const unpostedRaids = raids.filter(r => !r.message_id);
 
     if (unpostedRaids.length === 0) {
-      return await redirectToMainMenuWithError(interaction, '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited.');
+      return await redirectToMainMenu(interaction, '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited here.');
     }
 
     const options = unpostedRaids.map(raid => ({
@@ -447,7 +442,6 @@ async function showEditSelector(interaction) {
       .setPlaceholder('Select a preset to edit')
       .addOptions(options);
 
-    const { ButtonBuilder, ButtonStyle } = require('discord.js');
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
       .setLabel('◀️ Back to Main Menu')
@@ -461,9 +455,10 @@ async function showEditSelector(interaction) {
       embeds: [],
       components: [row1, row2]
     });
+
   } catch (error) {
     console.error('Show edit selector error:', error);
-    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
 
@@ -475,7 +470,7 @@ async function showDeleteSelector(interaction) {
     const unpostedRaids = raids.filter(r => !r.message_id);
 
     if (unpostedRaids.length === 0) {
-      return await redirectToMainMenuWithError(interaction, '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.');
+      return await redirectToMainMenu(interaction, '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.');
     }
 
     const options = unpostedRaids.map(raid => ({
@@ -490,7 +485,6 @@ async function showDeleteSelector(interaction) {
       .setPlaceholder('Select a preset to delete')
       .addOptions(options);
 
-    const { ButtonBuilder, ButtonStyle } = require('discord.js');
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
       .setLabel('◀️ Back to Main Menu')
@@ -504,15 +498,88 @@ async function showDeleteSelector(interaction) {
       embeds: [],
       components: [row1, row2]
     });
+
   } catch (error) {
     console.error('Show delete selector error:', error);
-    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
 
+async function handleBackToMain(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  const embed = await createMainMenuEmbed();
+  const buttonRow = createMainMenuButtons(interaction.user.id);
+  const roleRow = createRoleConfigDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const lockRow = createLockDropdown(interaction.user.id);
+  const unlockRow = createUnlockDropdown(interaction.user.id);
+  const embedRow = createEmbedDropdown(interaction.user.id);
+
+  await interaction.editReply({
+    content: null,
+    embeds: [embed],
+    components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+  });
+}
+
+async function redirectToMainMenu(interaction, errorMessage) {
+  const embed = await createMainMenuEmbed();
+  const buttonRow = createMainMenuButtons(interaction.user.id);
+  const roleRow = createRoleConfigDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const lockRow = createLockDropdown(interaction.user.id);
+  const unlockRow = createUnlockDropdown(interaction.user.id);
+  const embedRow = createEmbedDropdown(interaction.user.id);
+
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.reply({
+      content: errorMessage,
+      embeds: [embed],
+      components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow],
+      flags: 64
+    });
+  } else {
+    await interaction.editReply({
+      content: errorMessage,
+      embeds: [embed],
+      components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+    });
+  }
+
+  // Auto-remove error message after 3 seconds
+  setTimeout(async () => {
+    try {
+      await interaction.editReply({
+        content: null,
+        embeds: [embed],
+        components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+      });
+    } catch (err) {
+      // Ignore if interaction expired
+    }
+  }, 3000);
+}
+
 module.exports = {
-  handleRaidMainMenu,
-  handleBackToMain,
   createMainMenuEmbed,
-  createMainMenuRow
+  createMainMenuButtons,
+  createRoleConfigDropdown,
+  createPresetDropdown,
+  createLockDropdown,
+  createUnlockDropdown,
+  createEmbedDropdown,
+  handleRoleConfigMenu,
+  handlePresetMenu,
+  handleLockMenu,
+  handleUnlockMenu,
+  handleEmbedMenu,
+  handleQuickStart,
+  handleQuickComplete,
+  handleQuickEdit,
+  handleEditRaidSelect,
+  handleBackToMain
 };
