@@ -9,14 +9,13 @@ async function createMainMenuEmbed() {
   const raids = await getActiveRaids();
   
   const embed = new EmbedBuilder()
-    .setColor(0xEC4899);
+    .setColor(0xEC4899)
+    .setTitle('**🎮 iDolls Raid Manager**'); // Bold white title outside ANSI
 
   // Build full ANSI colored description matching the profile bot style
   let ansiContent = '```ansi\n';
   
-  // Title (bright blue like Class/Score labels)
-  ansiContent += '\u001b[1;34m🎮 iDolls Raid Manager\u001b[0m\n';
-  // Bold pink line (shorter like profile bot)
+  // Bold pink line
   ansiContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
   // Active Raids Section
@@ -40,18 +39,20 @@ async function createMainMenuEmbed() {
       };
       const formattedTime = startTime.toLocaleString('en-US', options) + ' UTC';
       
-      // Status indicators at the end
+      // Only lock status at the end
       const lockStatus = raid.locked ? '🔒' : '🔓';
+      
+      // Post status for display
       const postStatus = raid.message_id ? '✅' : '⏳';
       
-      // Raid info (bright blue labels, status at end of name)
-      ansiContent += `\u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m ${lockStatus} ${postStatus}\n`;
+      // Raid info (bright blue labels, only lock at end of name)
+      ansiContent += `${postStatus} \u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m ${lockStatus}\n`;
       ansiContent += `\u001b[1;34m👥 Size:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
       ansiContent += `\u001b[1;34m🕐 Time:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
     }
   }
   
-  // Bold pink line (shorter)
+  // Bold pink line
   ansiContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
   // Legend
