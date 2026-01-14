@@ -1,5 +1,4 @@
-const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, PermissionFlagsBits, EmbedBuilder, ModalBuilder, TextInputBuilder, TextInputStyle, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getActiveRaids, getConfig, eventDB } = require('../database/queries');
+const { SlashCommandBuilder, StringSelectMenuBuilder, ActionRowBuilder, PermissionFlagsBits, EmbedBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -21,9 +20,9 @@ module.exports = {
           emoji: '⚙️'
         },
         {
-          label: '➕ Create Raid',
+          label: '➕ Create Preset',
           value: 'create',
-          description: 'Create a new raid event',
+          description: 'Create a new raid preset',
           emoji: '➕'
         },
         {
@@ -89,8 +88,8 @@ module.exports = {
           inline: true 
         },
         { 
-          name: '➕ Create', 
-          value: 'Create new raid event', 
+          name: '➕ Create Preset', 
+          value: 'Create new raid preset', 
           inline: true 
         },
         { 
