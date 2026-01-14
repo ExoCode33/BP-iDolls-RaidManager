@@ -11,36 +11,49 @@ async function createMainMenuEmbed() {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899);
 
-  // Build full ANSI colored description
+  // Build full ANSI colored description matching the profile bot style
   let ansiContent = '```ansi\n';
   
-  // Title
+  // Title (cyan like IGN/Class labels)
   ansiContent += '\u001b[1;36m🎮 iDolls Raid Manager\u001b[0m\n';
-  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\n';
+  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
   // Active Raids Section
-  ansiContent += '\u001b[1;33m📋 ACTIVE RAIDS\u001b[0m\n';
+  ansiContent += '\u001b[1;37m📋 ACTIVE RAIDS\u001b[0m\n';
   
   if (raids.length === 0) {
-    ansiContent += '\u001b[0;37m   No active raids scheduled\u001b[0m\n';
+    ansiContent += '\u001b[0;37mNo active raids scheduled\u001b[0m\n';
   } else {
     for (const raid of raids) {
       const startTime = new Date(raid.start_time);
-      const utcTime = startTime.toUTCString();
       
-      // Status indicators
+      // Format: Mon DD, YYYY HH:MM AM/PM UTC
+      const options = { 
+        month: 'short', 
+        day: 'numeric', 
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'UTC'
+      };
+      const formattedTime = startTime.toLocaleString('en-US', options) + ' UTC';
+      
+      // Status indicators (colored like the profile bot emojis)
       const lockStatus = raid.locked ? '\u001b[1;31m🔒\u001b[0m' : '\u001b[1;32m🔓\u001b[0m';
       const postStatus = raid.message_id ? '\u001b[1;32m✅\u001b[0m' : '\u001b[1;33m⏳\u001b[0m';
       
-      // Raid info
-      ansiContent += `${lockStatus} ${postStatus} \u001b[1;36m${raid.name}\u001b[0m • \u001b[1;37m${raid.raid_size}p\u001b[0m • \u001b[0;37m${utcTime}\u001b[0m\n`;
+      // Raid info (cyan labels like "IGN:", white values)
+      ansiContent += `${lockStatus} ${postStatus} \u001b[1;36mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m\n`;
+      ansiContent += `   \u001b[1;36mSize:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
+      ansiContent += `   \u001b[1;36mTime:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
     }
   }
   
-  ansiContent += '\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\n';
+  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
-  // Legend
-  ansiContent += '\u001b[0;90m🔒 Locked  🔓 Open  ✅ Posted  ⏳ Draft\u001b[0m\n';
+  // Legend (white text like the profile)
+  ansiContent += '\u001b[1;37m🔒 Locked  🔓 Open  ✅ Posted  ⏳ Draft\u001b[0m\n';
   
   ansiContent += '```';
   
