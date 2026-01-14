@@ -252,15 +252,26 @@ async function handleRefresh(interaction, raid) {
 }
 
 async function redirectToMainMenu(interaction, errorMessage) {
-  const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+  const { 
+    createMainMenuEmbed, 
+    createMainMenuButtons,
+    createRoleConfigDropdown,
+    createPresetDropdown,
+    createLockUnlockDropdown,
+    createEmbedDropdown
+  } = require('./main-menu');
   
-  const embed = createMainMenuEmbed();
-  const row = createMainMenuRow(interaction.user.id);
+  const embed = await createMainMenuEmbed();
+  const buttonRow = createMainMenuButtons(interaction.user.id);
+  const roleRow = createRoleConfigDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
+  const embedRow = createEmbedDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: errorMessage,
     embeds: [embed],
-    components: [row]
+    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
   });
 
   // Auto-remove error message after 3 seconds
@@ -269,7 +280,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [row]
+        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
       });
     } catch (err) {
       // Ignore if interaction expired
