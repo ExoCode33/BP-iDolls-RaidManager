@@ -113,27 +113,17 @@ function createPresetDropdown(userId) {
   return new ActionRowBuilder().addComponents(dropdown);
 }
 
-function createLockDropdown(userId) {
+function createLockUnlockDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_lock_menu_${userId}`)
-    .setPlaceholder('🔒 Lock Management')
+    .setCustomId(`raid_lock_unlock_menu_${userId}`)
+    .setPlaceholder('🔒 Lock / Unlock Management')
     .addOptions([
       {
         label: '🔒 Lock Raid',
         value: 'lock',
         description: 'Prevent new registrations',
         emoji: '🔒'
-      }
-    ]);
-
-  return new ActionRowBuilder().addComponents(dropdown);
-}
-
-function createUnlockDropdown(userId) {
-  const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_unlock_menu_${userId}`)
-    .setPlaceholder('🔓 Unlock Management')
-    .addOptions([
+      },
       {
         label: '🔓 Unlock Raid',
         value: 'unlock',
@@ -210,18 +200,22 @@ async function handlePresetMenu(interaction) {
   }
 }
 
-async function handleLockMenu(interaction) {
+async function handleLockUnlockMenu(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await showRaidSelector(interaction, 'lock', '🔒 Lock Registration');
-}
+  const action = interaction.values[0];
 
-async function handleUnlockMenu(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  await showRaidSelector(interaction, 'unlock', '🔓 Unlock Registration');
+  try {
+    if (action === 'lock') {
+      await showRaidSelector(interaction, 'lock', '🔒 Lock Registration');
+    } else if (action === 'unlock') {
+      await showRaidSelector(interaction, 'unlock', '🔓 Unlock Registration');
+    }
+  } catch (error) {
+    console.error('Lock/Unlock menu error:', error);
+    await redirectToMainMenu(interaction, '❌ An error occurred!');
+  }
 }
 
 async function handleEmbedMenu(interaction) {
@@ -515,14 +509,13 @@ async function handleBackToMain(interaction) {
   const buttonRow = createMainMenuButtons(interaction.user.id);
   const roleRow = createRoleConfigDropdown(interaction.user.id);
   const presetRow = createPresetDropdown(interaction.user.id);
-  const lockRow = createLockDropdown(interaction.user.id);
-  const unlockRow = createUnlockDropdown(interaction.user.id);
+  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
   const embedRow = createEmbedDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: null,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
   });
 }
 
@@ -531,22 +524,21 @@ async function redirectToMainMenu(interaction, errorMessage) {
   const buttonRow = createMainMenuButtons(interaction.user.id);
   const roleRow = createRoleConfigDropdown(interaction.user.id);
   const presetRow = createPresetDropdown(interaction.user.id);
-  const lockRow = createLockDropdown(interaction.user.id);
-  const unlockRow = createUnlockDropdown(interaction.user.id);
+  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
   const embedRow = createEmbedDropdown(interaction.user.id);
 
   if (!interaction.deferred && !interaction.replied) {
     await interaction.reply({
       content: errorMessage,
       embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow],
+      components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow],
       flags: 64
     });
   } else {
     await interaction.editReply({
       content: errorMessage,
       embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+      components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
     });
   }
 
@@ -556,7 +548,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [buttonRow, roleRow, presetRow, lockRow, unlockRow, embedRow]
+        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
       });
     } catch (err) {
       // Ignore if interaction expired
@@ -569,13 +561,11 @@ module.exports = {
   createMainMenuButtons,
   createRoleConfigDropdown,
   createPresetDropdown,
-  createLockDropdown,
-  createUnlockDropdown,
+  createLockUnlockDropdown,
   createEmbedDropdown,
   handleRoleConfigMenu,
   handlePresetMenu,
-  handleLockMenu,
-  handleUnlockMenu,
+  handleLockUnlockMenu,
   handleEmbedMenu,
   handleQuickStart,
   handleQuickComplete,
