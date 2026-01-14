@@ -61,7 +61,7 @@ async function handleLock(interaction, raid) {
       const message = await channel.messages.fetch(raid.message_id);
       
       const registrations = await getRaidRegistrations(raid.id);
-      const embed = createRaidEmbed({ ...raid, locked: true }, registrations);
+      const embed = await createRaidEmbed({ ...raid, locked: true }, registrations);
       const buttons = createRaidButtons(raid.id, true); // true = locked
 
       await message.edit({ embeds: [embed], components: [buttons] });
@@ -93,7 +93,7 @@ async function handleUnlock(interaction, raid) {
       const message = await channel.messages.fetch(raid.message_id);
       
       const registrations = await getRaidRegistrations(raid.id);
-      const embed = createRaidEmbed({ ...raid, locked: false }, registrations);
+      const embed = await createRaidEmbed({ ...raid, locked: false }, registrations);
       const buttons = createRaidButtons(raid.id, false); // false = unlocked
 
       await message.edit({ embeds: [embed], components: [buttons] });
@@ -229,7 +229,7 @@ async function handleRefresh(interaction, raid) {
     const message = await channel.messages.fetch(raid.message_id);
     
     const registrations = await getRaidRegistrations(raid.id);
-    const embed = createRaidEmbed(raid, registrations);
+    const embed = await createRaidEmbed(raid, registrations);
     const buttons = createRaidButtons(raid.id, raid.locked);
 
     await message.edit({ embeds: [embed], components: [buttons] });
