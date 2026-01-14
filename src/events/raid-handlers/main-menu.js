@@ -40,12 +40,12 @@ async function createMainMenuEmbed() {
       };
       const formattedTime = startTime.toLocaleString('en-US', options) + ' UTC';
       
-      // Status indicators
-      const lockStatus = raid.locked ? '\u001b[1;31m🔒\u001b[0m' : '\u001b[1;32m🔓\u001b[0m';
-      const postStatus = raid.message_id ? '\u001b[1;32m✅\u001b[0m' : '\u001b[1;33m⏳\u001b[0m';
+      // Status indicators at the end
+      const lockStatus = raid.locked ? '🔒' : '🔓';
+      const postStatus = raid.message_id ? '✅' : '⏳';
       
-      // Raid info (bright blue labels like "Class:", white values)
-      ansiContent += `${lockStatus} ${postStatus} \u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m\n`;
+      // Raid info (bright blue labels, status at end of name)
+      ansiContent += `\u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m ${lockStatus} ${postStatus}\n`;
       ansiContent += `\u001b[1;34m👥 Size:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
       ansiContent += `\u001b[1;34m🕐 Time:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
     }
