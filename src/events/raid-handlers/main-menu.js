@@ -9,39 +9,42 @@ async function createMainMenuEmbed() {
   const raids = await getActiveRaids();
   
   const embed = new EmbedBuilder()
-    .setColor(0xEC4899); // Pink color for the side bar
+    .setColor(0xEC4899);
 
-  embed.setTitle('🎮 iDolls Raid Manager');
-
-  // Pink line using ANSI
-  const pinkLine = '```ansi\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```';
-
-  // Always show active raids
+  // Build full ANSI colored description
+  let ansiContent = '```ansi\n';
+  
+  // Title
+  ansiContent += '\u001b[1;36m🎮 iDolls Raid Manager\u001b[0m\n';
+  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\n';
+  
+  // Active Raids Section
+  ansiContent += '\u001b[1;33m📋 ACTIVE RAIDS\u001b[0m\n';
+  
   if (raids.length === 0) {
-    embed.setDescription(
-      pinkLine +
-      '📋 **ACTIVE RAIDS**\n' +
-      '*No active raids scheduled*\n' +
-      pinkLine
-    );
+    ansiContent += '\u001b[0;37m   No active raids scheduled\u001b[0m\n';
   } else {
-    let raidsList = '';
     for (const raid of raids) {
-      const startTime = Math.floor(new Date(raid.start_time).getTime() / 1000);
-      const status = raid.locked ? '🔒' : '🔓';
-      const posted = raid.message_id ? '✅' : '⏳';
-      raidsList += `${status} ${posted} **${raid.name}** • ${raid.raid_size}p • <t:${startTime}:F>\n`;
+      const startTime = new Date(raid.start_time);
+      const utcTime = startTime.toUTCString();
+      
+      // Status indicators
+      const lockStatus = raid.locked ? '\u001b[1;31m🔒\u001b[0m' : '\u001b[1;32m🔓\u001b[0m';
+      const postStatus = raid.message_id ? '\u001b[1;32m✅\u001b[0m' : '\u001b[1;33m⏳\u001b[0m';
+      
+      // Raid info
+      ansiContent += `${lockStatus} ${postStatus} \u001b[1;36m${raid.name}\u001b[0m • \u001b[1;37m${raid.raid_size}p\u001b[0m • \u001b[0;37m${utcTime}\u001b[0m\n`;
     }
-    
-    embed.setDescription(
-      pinkLine +
-      '📋 **ACTIVE RAIDS**\n' +
-      raidsList +
-      pinkLine
-    );
   }
-
-  embed.setFooter({ text: '🔒 Locked | 🔓 Open | ✅ Posted | ⏳ Draft' });
+  
+  ansiContent += '\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\n';
+  
+  // Legend
+  ansiContent += '\u001b[0;90m🔒 Locked  🔓 Open  ✅ Posted  ⏳ Draft\u001b[0m\n';
+  
+  ansiContent += '```';
+  
+  embed.setDescription(ansiContent);
   
   return embed;
 }
