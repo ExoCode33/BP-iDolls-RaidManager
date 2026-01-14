@@ -12,7 +12,11 @@ async function showStartRaidSelector(interaction) {
     const raids = await getUnpostedRaids();
 
     if (raids.length === 0) {
-      return await redirectToMainMenu(interaction, '❌ No raids available to start!\n\nAll raids are either already posted or there are no raids created.\n\nUse **➕ Create Preset** to create a new raid first.');
+      await interaction.followUp({
+        content: '❌ No raids available to start!\n\nCreate a raid first using **Create Preset**.',
+        ephemeral: true
+      });
+      return;
     }
 
     const options = raids.map(raid => ({
@@ -28,20 +32,27 @@ async function showStartRaidSelector(interaction) {
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
+      .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // Keep the main embed visible
+    const { createMainMenuEmbed } = require('./main-menu');
+    const embed = await createMainMenuEmbed();
+
     await interaction.editReply({
-      content: '🚀 **Start Raid:** Select which raid to post to the channel',
-      embeds: [],
+      content: null,
+      embeds: [embed],
       components: [row1, row2]
     });
   } catch (error) {
     console.error('Show start selector error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
@@ -90,15 +101,26 @@ async function handleStartSelect(interaction) {
 }
 
 async function redirectToMainMenu(interaction, errorMessage) {
-  const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+  const { 
+    createMainMenuEmbed, 
+    createMainMenuButtons,
+    createRoleConfigDropdown,
+    createPresetDropdown,
+    createLockUnlockDropdown,
+    createEmbedDropdown
+  } = require('./main-menu');
   
-  const embed = createMainMenuEmbed();
-  const row = createMainMenuRow(interaction.user.id);
+  const embed = await createMainMenuEmbed();
+  const buttonRow = createMainMenuButtons(interaction.user.id);
+  const roleRow = createRoleConfigDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
+  const embedRow = createEmbedDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: errorMessage,
     embeds: [embed],
-    components: [row]
+    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
   });
 
   // Auto-remove error message after 3 seconds
@@ -107,7 +129,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [row]
+        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
       });
     } catch (err) {
       // Ignore if interaction expired
