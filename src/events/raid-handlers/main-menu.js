@@ -11,12 +11,12 @@ async function createMainMenuEmbed() {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
     .setTitle('🎮 iDolls Raid Manager')
-    .setDescription('```ansi\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```');
+    .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
   // Always show active raids
   if (raids.length === 0) {
     embed.addFields({
-      name: '```ansi\n\u001b[0;36m📋 ACTIVE RAIDS\u001b[0m\n```',
+      name: '📋 ACTIVE RAIDS',
       value: '*No active raids scheduled*',
       inline: false
     });
@@ -29,21 +29,54 @@ async function createMainMenuEmbed() {
       raidsList += `${status} ${posted} **${raid.name}** • ${raid.raid_size}p • <t:${startTime}:F>\n`;
     }
     embed.addFields({
-      name: '```ansi\n\u001b[0;36m📋 ACTIVE RAIDS\u001b[0m\n```',
+      name: '📋 ACTIVE RAIDS',
       value: raidsList,
       inline: false
     });
   }
 
   embed.addFields(
-    { name: '\u200B', value: '```ansi\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```', inline: false },
     { 
-      name: '```ansi\n\u001b[0;33m⚡ QUICK ACTIONS\u001b[0m\n```', 
+      name: '\u200B', 
+      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
+      inline: false 
+    },
+    { 
+      name: '⚡ QUICK ACTIONS', 
       value: '**Buttons:** Post raids • Mark complete • Edit active raids\n' +
              '**Dropdowns:** Configure settings • Manage presets • Control raids', 
       inline: false 
     },
-    { name: '\u200B', value: '```ansi\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```', inline: false }
+    { 
+      name: '\u200B', 
+      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
+      inline: false 
+    },
+    {
+      name: '⚙️ ROLE CONFIGURATION',
+      value: 'Set Raid 1 and Raid 2 role IDs',
+      inline: false
+    },
+    {
+      name: '📝 PRESET MANAGEMENT',
+      value: 'Create, edit, or delete raid templates',
+      inline: false
+    },
+    {
+      name: '🔒 LOCK / UNLOCK',
+      value: 'Control raid registrations',
+      inline: false
+    },
+    {
+      name: '📺 EMBED MANAGEMENT',
+      value: 'Refresh or repost raid embeds',
+      inline: false
+    },
+    { 
+      name: '\u200B', 
+      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
+      inline: false 
+    }
   );
 
   embed.setFooter({ text: '🔒 Locked | 🔓 Open | ✅ Posted | ⏳ Draft' });
@@ -73,7 +106,7 @@ function createMainMenuButtons(userId) {
 function createRoleConfigDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
     .setCustomId(`raid_role_config_${userId}`)
-    .setPlaceholder('⚙️ Role Configuration • Set Raid 1 & Raid 2 roles')
+    .setPlaceholder('⚙️ Role Configuration')
     .addOptions([
       {
         label: '⚙️ Configure Raid Roles',
@@ -89,7 +122,7 @@ function createRoleConfigDropdown(userId) {
 function createPresetDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
     .setCustomId(`raid_preset_menu_${userId}`)
-    .setPlaceholder('📝 Preset Management • Create, edit, or delete templates')
+    .setPlaceholder('📝 Preset Management')
     .addOptions([
       {
         label: '➕ Create Preset',
@@ -117,7 +150,7 @@ function createPresetDropdown(userId) {
 function createLockUnlockDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
     .setCustomId(`raid_lock_unlock_menu_${userId}`)
-    .setPlaceholder('🔒 Lock / Unlock • Control raid registrations')
+    .setPlaceholder('🔒 Lock / Unlock')
     .addOptions([
       {
         label: '🔒 Lock Raid',
@@ -139,7 +172,7 @@ function createLockUnlockDropdown(userId) {
 function createEmbedDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
     .setCustomId(`raid_embed_menu_${userId}`)
-    .setPlaceholder('📺 Embed Management • Refresh or repost raid embeds')
+    .setPlaceholder('📺 Embed Management')
     .addOptions([
       {
         label: '🔄 Refresh Embed',
