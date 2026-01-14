@@ -137,7 +137,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
       await command.execute(interaction);
     } 
     else if (interaction.isButton()) {
-      await handleButton(interaction);
+      // Handle back to main menu button
+      if (interaction.customId.startsWith('raid_back_to_main_')) {
+        const { handleBackToMain } = require('./events/interactions');
+        await handleBackToMain(interaction);
+      }
+      // Handle date button
+      else if (interaction.customId.startsWith('raid_date_button_')) {
+        const { handleDateButton } = require('./events/interactions');
+        await handleDateButton(interaction);
+      }
+      else {
+        await handleButton(interaction);
+      }
     }
     else if (interaction.isStringSelectMenu()) {
       // Route select menus correctly
@@ -157,7 +169,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleManualScoreSelect } = require('./events/interactions');
         await handleManualScoreSelect(interaction);
       }
-      // NEW: Raid menu handlers
+      // Raid menu handlers
       else if (interaction.customId.startsWith('raid_main_menu_')) {
         const { handleRaidMainMenu } = require('./events/interactions');
         await handleRaidMainMenu(interaction);
@@ -192,7 +204,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleManualIGNModal } = require('./events/interactions');
         await handleManualIGNModal(interaction);
       }
-      // NEW: Raid modals
+      // Raid modals
       else if (interaction.customId.startsWith('raid_setup_modal_')) {
         const { handleSetupModal } = require('./events/interactions');
         await handleSetupModal(interaction);
