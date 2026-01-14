@@ -7,13 +7,13 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
-    .setTitle(`**${raid.name}**`); // Bold title
+    .setTitle(`✨ ${raid.name} ✨`); // Cute title with sparkles
   
-  // Professional description with better formatting
+  // Cute description without separator line
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   embed.setDescription(
-    `📅 **<t:${timestamp}:F>**\n🎮 @Raid ${raidNumber}\n\n━━━━━━━━━━━━━━━━━━━━━━`
+    `📅 <t:${timestamp}:F>\n🎮 Raid ${raidNumber}`
   );
 
   // Separate by role and status
@@ -42,7 +42,7 @@ async function createRaidEmbed(raid, registrations) {
   }
   
   embed.addFields({ 
-    name: `🛡️ **Tank (${tanks.length}/${tankMax})**`, 
+    name: `🛡️ Tank (${tanks.length}/${tankMax})`, 
     value: tankText || '┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
@@ -64,7 +64,7 @@ async function createRaidEmbed(raid, registrations) {
   }
   
   embed.addFields({ 
-    name: `💚 **Support (${supports.length}/${supportMax})**`, 
+    name: `💚 Support (${supports.length}/${supportMax})`, 
     value: supportText || '┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
@@ -86,7 +86,7 @@ async function createRaidEmbed(raid, registrations) {
   }
   
   embed.addFields({ 
-    name: `⚔️ **DPS (${dps.length}/${dpsMax})**`, 
+    name: `⚔️ DPS (${dps.length}/${dpsMax})`, 
     value: dpsText || '┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
@@ -96,7 +96,7 @@ async function createRaidEmbed(raid, registrations) {
     try {
       const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
       embed.addFields({ 
-        name: `⏳ **Waitlist (${waitlist.length})**`, 
+        name: `⏳ Waitlist (${waitlist.length})`, 
         value: waitlistText, 
         inline: false 
       });
@@ -104,15 +104,15 @@ async function createRaidEmbed(raid, registrations) {
       console.error('Error formatting waitlist:', err);
       const waitlistText = waitlist.map(w => `${w.ign} [Assist]`).join('\n');
       embed.addFields({ 
-        name: `⏳ **Waitlist (${waitlist.length})**`, 
+        name: `⏳ Waitlist (${waitlist.length})`, 
         value: waitlistText, 
         inline: false 
       });
     }
   }
 
-  // Add footer with cute message
-  embed.setFooter({ text: '✨ Good luck, adventurers!' });
+  // Add cute footer with iDolls vibe
+  embed.setFooter({ text: '✨ iDolls Raid | Show time!' });
   embed.setTimestamp();
 
   return embed;
