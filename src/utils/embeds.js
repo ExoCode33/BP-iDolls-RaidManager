@@ -7,100 +7,113 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
-    .setTitle(raid.name);
+    .setTitle(`**${raid.name}**`); // Bold title
   
-  // Always set a description, even if minimal
+  // Professional description with better formatting
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   embed.setDescription(
-    `<t:${timestamp}:F>\n@Raid ${raidNumber}`
+    `📅 **<t:${timestamp}:F>**\n🎮 @Raid ${raidNumber}\n\n━━━━━━━━━━━━━━━━━━━━━━`
   );
 
   // Separate by role and status
   const registered = registrations.filter(r => r.status === 'registered');
   const waitlist = registrations.filter(r => r.status === 'waitlist');
 
-  // Count by role - fix role field to lowercase
+  // Count by role
   const tanks = registered.filter(r => r.role && r.role.toLowerCase() === 'tank');
   const supports = registered.filter(r => r.role && r.role.toLowerCase() === 'support');
   const dps = registered.filter(r => r.role && r.role.toLowerCase() === 'dps');
 
-  // Tank section (0/2)
+  // Tank section with reserved spots
   const tankMax = 2;
   let tankText = '';
-  if (tanks.length === 0) {
-    tankText = '*Empty*';
-  } else {
+  if (tanks.length > 0) {
     try {
       tankText = (await Promise.all(tanks.map(t => formatPlayer(t, false)))).join('\n');
     } catch (err) {
       console.error('Error formatting tanks:', err);
-      tankText = tanks.map(t => `🟢 ${t.ign}`).join('\n');
+      tankText = tanks.map(t => `${t.ign}`).join('\n');
     }
   }
+  // Add empty spots
+  for (let i = tanks.length; i < tankMax; i++) {
+    tankText += (tankText ? '\n' : '') + '┗ *Open Spot*';
+  }
+  
   embed.addFields({ 
-    name: `Tank (${tanks.length}/${tankMax}):`, 
-    value: tankText, 
+    name: `🛡️ **Tank (${tanks.length}/${tankMax})**`, 
+    value: tankText || '┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
 
-  // Support section (1/2)
+  // Support section with reserved spots
   const supportMax = 2;
   let supportText = '';
-  if (supports.length === 0) {
-    supportText = '*Empty*';
-  } else {
+  if (supports.length > 0) {
     try {
       supportText = (await Promise.all(supports.map(s => formatPlayer(s, false)))).join('\n');
     } catch (err) {
       console.error('Error formatting supports:', err);
-      supportText = supports.map(s => `🟢 ${s.ign}`).join('\n');
+      supportText = supports.map(s => `${s.ign}`).join('\n');
     }
   }
+  // Add empty spots
+  for (let i = supports.length; i < supportMax; i++) {
+    supportText += (supportText ? '\n' : '') + '┗ *Open Spot*';
+  }
+  
   embed.addFields({ 
-    name: `Support (${supports.length}/${supportMax}):`, 
-    value: supportText, 
+    name: `💚 **Support (${supports.length}/${supportMax})**`, 
+    value: supportText || '┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
 
-  // DPS section (0/8)
-  const dpsMax = raid.raid_size - 4; // Total minus tanks and supports
+  // DPS section with reserved spots
+  const dpsMax = raid.raid_size - 4;
   let dpsText = '';
-  if (dps.length === 0) {
-    dpsText = '*Empty*';
-  } else {
+  if (dps.length > 0) {
     try {
       dpsText = (await Promise.all(dps.map(d => formatPlayer(d, false)))).join('\n');
     } catch (err) {
       console.error('Error formatting dps:', err);
-      dpsText = dps.map(d => `🟢 ${d.ign}`).join('\n');
+      dpsText = dps.map(d => `${d.ign}`).join('\n');
     }
   }
+  // Add empty spots
+  for (let i = dps.length; i < dpsMax; i++) {
+    dpsText += (dpsText ? '\n' : '') + '┗ *Open Spot*';
+  }
+  
   embed.addFields({ 
-    name: `DPS (${dps.length}/${dpsMax}):`, 
-    value: dpsText, 
+    name: `⚔️ **DPS (${dps.length}/${dpsMax})**`, 
+    value: dpsText || '┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*\n┗ *Open Spot*', 
     inline: false 
   });
 
-  // Waitlist section (Assist)
+  // Waitlist section
   if (waitlist.length > 0) {
     try {
       const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
       embed.addFields({ 
-        name: `⏳ Waitlist (${waitlist.length}):`, 
+        name: `⏳ **Waitlist (${waitlist.length})**`, 
         value: waitlistText, 
         inline: false 
       });
     } catch (err) {
       console.error('Error formatting waitlist:', err);
-      const waitlistText = waitlist.map(w => `🟢 ${w.ign} [Assist]`).join('\n');
+      const waitlistText = waitlist.map(w => `${w.ign} [Assist]`).join('\n');
       embed.addFields({ 
-        name: `⏳ Waitlist (${waitlist.length}):`, 
+        name: `⏳ **Waitlist (${waitlist.length})**`, 
         value: waitlistText, 
         inline: false 
       });
     }
   }
+
+  // Add footer with cute message
+  embed.setFooter({ text: '✨ Good luck, adventurers!' });
+  embed.setTimestamp();
 
   return embed;
 }
