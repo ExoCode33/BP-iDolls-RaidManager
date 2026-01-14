@@ -26,6 +26,18 @@ module.exports = {
           emoji: '➕'
         },
         {
+          label: '✏️ Edit Preset',
+          value: 'edit',
+          description: 'Edit an existing preset',
+          emoji: '✏️'
+        },
+        {
+          label: '🗑️ Delete Preset',
+          value: 'delete',
+          description: 'Delete a preset',
+          emoji: '🗑️'
+        },
+        {
           label: '🚀 Start Raid',
           value: 'start',
           description: 'Post raid to channel',
@@ -93,6 +105,11 @@ module.exports = {
           inline: true 
         },
         { 
+          name: '✏️ Edit | 🗑️ Delete', 
+          value: 'Modify presets', 
+          inline: true 
+        },
+        { 
           name: '🚀 Start', 
           value: 'Post raid to channel', 
           inline: true 
@@ -118,13 +135,8 @@ module.exports = {
           inline: true 
         },
         { 
-          name: '📝 Repost', 
-          value: 'Repost deleted embed', 
-          inline: true 
-        },
-        { 
-          name: '🔄 Refresh', 
-          value: 'Update embed', 
+          name: '📝 Repost | 🔄 Refresh', 
+          value: 'Update embeds', 
           inline: true 
         }
       )
