@@ -1,11 +1,5 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { Pool } = require('pg');
-
-// Profile database connection
-const profilePool = new Pool({
-  connectionString: process.env.PROFILE_BOT_DB_URL || process.env.EVENT_BOT_DB_URL,
-  ssl: false
-});
+const { getUserCharacters } = require('../database/queries');
 
 // ═══════════════════════════════════════════════════════════════
 // RAID EMBED CREATION
@@ -113,14 +107,12 @@ async function createRaidEmbed(raid, registrations) {
 }
 
 async function formatPlayer(registration, isAssist) {
-  // Get player character data from profile database
+  // Get player character data using the existing getUserCharacters function
   let characterData = null;
   try {
-    const result = await profilePool.query(
-      `SELECT ign, class, subclass, ability_score, class_emoji FROM characters WHERE discord_id = $1 AND type = 'main' LIMIT 1`,
-      [registration.user_id]
-    );
-    characterData = result.rows[0];
+    const characters = await getUserCharacters(registration.user_id);
+    // Find the main character
+    characterData = characters.find(c => c.type === 'main');
   } catch (err) {
     console.error('Error fetching character data:', err);
   }
