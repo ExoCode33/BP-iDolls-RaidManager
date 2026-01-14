@@ -117,8 +117,8 @@ async function formatPlayer(registration, isAssist) {
   let characterData = null;
   try {
     const result = await profilePool.query(
-      `SELECT ign, class, subclass, ability_score FROM characters WHERE discord_id = $1 AND type = 'main' LIMIT 1`,
-      [registration.user_id]  // ✅ FIXED - use user_id instead of discord_id
+      `SELECT ign, class, subclass, ability_score, class_emoji FROM characters WHERE discord_id = $1 AND type = 'main' LIMIT 1`,
+      [registration.user_id]
     );
     characterData = result.rows[0];
   } catch (err) {
@@ -130,14 +130,30 @@ async function formatPlayer(registration, isAssist) {
   const subclass = characterData?.subclass || registration.subclass || registration.class || '';
   const score = characterData?.ability_score || registration.ability_score || '';
   
-  // Status indicator (green dot for registered)
-  const statusDot = '🟢';
+  // Get custom emoji from database (class_emoji field)
+  let classEmoji = characterData?.class_emoji || '';
   
-  // Class emoji based on subclass name
-  const classEmoji = getClassEmoji(subclass);
+  // If no custom emoji in database, fall back to getClassEmoji
+  if (!classEmoji) {
+    classEmoji = getClassEmoji(subclass);
+  }
   
-  // Build format: 🟢 IGN • Subclass 🎯 [30-32k] [Assist]
-  let formatted = `${statusDot} ${ign}`;
+  // Format ability score as range (e.g., 31000 -> "30K-32K")
+  let scoreRange = '';
+  if (score) {
+    const numScore = parseInt(score);
+    if (!isNaN(numScore)) {
+      const lowerBound = Math.floor(numScore / 1000) * 1000;
+      const upperBound = lowerBound + 2000;
+      scoreRange = `[${lowerBound/1000}K-${upperBound/1000}K]`;
+    } else {
+      // If score is already formatted, use as-is
+      scoreRange = `[${score}]`;
+    }
+  }
+  
+  // Build format: IGN • Subclass 🎯 [30K-32K] [Assist]
+  let formatted = ign;
   
   if (subclass) {
     formatted += ` • ${subclass}`;
@@ -147,8 +163,8 @@ async function formatPlayer(registration, isAssist) {
     formatted += ` ${classEmoji}`;
   }
   
-  if (score) {
-    formatted += ` [${score}]`;
+  if (scoreRange) {
+    formatted += ` ${scoreRange}`;
   }
   
   if (isAssist) {
