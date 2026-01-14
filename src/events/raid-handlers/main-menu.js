@@ -14,9 +14,10 @@ async function createMainMenuEmbed() {
   // Build full ANSI colored description matching the profile bot style
   let ansiContent = '```ansi\n';
   
-  // Title (cyan like IGN/Class labels)
-  ansiContent += '\u001b[1;36m🎮 iDolls Raid Manager\u001b[0m\n';
-  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
+  // Title (bright blue like Class/Score labels)
+  ansiContent += '\u001b[1;34m🎮 iDolls Raid Manager\u001b[0m\n';
+  // Bold pink line (shorter like profile bot)
+  ansiContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
   // Active Raids Section
   ansiContent += '\u001b[1;37m📋 ACTIVE RAIDS\u001b[0m\n';
@@ -39,20 +40,21 @@ async function createMainMenuEmbed() {
       };
       const formattedTime = startTime.toLocaleString('en-US', options) + ' UTC';
       
-      // Status indicators (colored like the profile bot emojis)
+      // Status indicators
       const lockStatus = raid.locked ? '\u001b[1;31m🔒\u001b[0m' : '\u001b[1;32m🔓\u001b[0m';
       const postStatus = raid.message_id ? '\u001b[1;32m✅\u001b[0m' : '\u001b[1;33m⏳\u001b[0m';
       
-      // Raid info (cyan labels like "IGN:", white values)
-      ansiContent += `${lockStatus} ${postStatus} \u001b[1;36mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m\n`;
-      ansiContent += `   \u001b[1;36mSize:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
-      ansiContent += `   \u001b[1;36mTime:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
+      // Raid info (bright blue labels like "Class:", white values)
+      ansiContent += `${lockStatus} ${postStatus} \u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m\n`;
+      ansiContent += `\u001b[1;34m👥 Size:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
+      ansiContent += `\u001b[1;34m🕐 Time:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
     }
   }
   
-  ansiContent += '\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
+  // Bold pink line (shorter)
+  ansiContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
-  // Legend (white text like the profile)
+  // Legend
   ansiContent += '\u001b[1;37m🔒 Locked  🔓 Open  ✅ Posted  ⏳ Draft\u001b[0m\n';
   
   ansiContent += '```';
