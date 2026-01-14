@@ -8,8 +8,8 @@ const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 
 async function handleRaidAction(interaction) {
   const parts = interaction.customId.split('_');
-  const action = parts[2]; // raid_action_LOCK_userId
-  const userId = parts[3];
+  const action = parts[3]; // raid_action_select_ACTION_userId
+  const userId = parts[4];
   
   if (userId !== interaction.user.id) return;
 
