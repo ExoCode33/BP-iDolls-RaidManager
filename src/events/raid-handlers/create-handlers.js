@@ -207,17 +207,30 @@ async function handleSizeSelect(interaction) {
     state.step = 'channel';
     raidCreationState.set(interaction.user.id, state);
 
-    // Show channel dropdown
-    const channelOptions = Object.entries(CHANNEL_PRESETS).map(([name, id]) => ({
-      label: name,
-      value: id,
+    // Fetch actual channels from the guild
+    const guild = interaction.guild;
+    const textChannels = guild.channels.cache
+      .filter(channel => channel.type === 0) // 0 = Text channels
+      .sort((a, b) => a.position - b.position);
+
+    // Limit to first 25 channels (Discord limit)
+    const channelsArray = Array.from(textChannels.values()).slice(0, 25);
+
+    if (channelsArray.length === 0) {
+      return await redirectToMainMenu(interaction, '❌ No text channels found!');
+    }
+
+    const channels = channelsArray.map(channel => ({
+      label: `#${channel.name}`,
+      value: channel.id,
+      description: channel.topic ? channel.topic.substring(0, 100) : 'No description',
       emoji: '📺'
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`raid_create_channel_${interaction.user.id}`)
       .setPlaceholder('📺 Select channel')
-      .addOptions(channelOptions);
+      .addOptions(channels);
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
