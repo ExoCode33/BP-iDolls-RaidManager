@@ -11,16 +11,18 @@ async function createMainMenuEmbed() {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899); // Pink color for the side bar
 
-  // Title without description separator
   embed.setTitle('🎮 iDolls Raid Manager');
+
+  // Pink line using ANSI
+  const pinkLine = '```ansi\n\u001b[0;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```';
 
   // Always show active raids
   if (raids.length === 0) {
     embed.setDescription(
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+      pinkLine +
       '📋 **ACTIVE RAIDS**\n' +
-      '*No active raids scheduled*\n\n' +
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+      '*No active raids scheduled*\n' +
+      pinkLine
     );
   } else {
     let raidsList = '';
@@ -32,10 +34,10 @@ async function createMainMenuEmbed() {
     }
     
     embed.setDescription(
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n' +
+      pinkLine +
       '📋 **ACTIVE RAIDS**\n' +
-      raidsList + '\n' +
-      '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'
+      raidsList +
+      pinkLine
     );
   }
 
