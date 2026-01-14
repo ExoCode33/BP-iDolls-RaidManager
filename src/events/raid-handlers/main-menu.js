@@ -22,6 +22,11 @@ function createMainMenuEmbed() {
         inline: true 
       },
       { 
+        name: '✏️ Edit | 🗑️ Delete', 
+        value: 'Modify presets', 
+        inline: true 
+      },
+      { 
         name: '🚀 Start', 
         value: 'Post raid to channel', 
         inline: true 
@@ -47,13 +52,8 @@ function createMainMenuEmbed() {
         inline: true 
       },
       { 
-        name: '📝 Repost', 
-        value: 'Repost deleted embed', 
-        inline: true 
-      },
-      { 
-        name: '🔄 Refresh', 
-        value: 'Update embed', 
+        name: '📝 Repost | 🔄 Refresh', 
+        value: 'Update embeds', 
         inline: true 
       }
     )
@@ -76,6 +76,18 @@ function createMainMenuRow(userId) {
         value: 'create',
         description: 'Create a new raid preset',
         emoji: '➕'
+      },
+      {
+        label: '✏️ Edit Preset',
+        value: 'edit',
+        description: 'Edit an existing preset',
+        emoji: '✏️'
+      },
+      {
+        label: '🗑️ Delete Preset',
+        value: 'delete',
+        description: 'Delete a preset',
+        emoji: '🗑️'
       },
       {
         label: '🚀 Start Raid',
@@ -146,6 +158,14 @@ async function handleRaidMainMenu(interaction) {
       case 'create':
         const createHandlers = require('./create-handlers');
         await createHandlers.startCreateFlow(interaction);
+        break;
+      
+      case 'edit':
+        await showEditSelector(interaction);
+        break;
+      
+      case 'delete':
+        await showDeleteSelector(interaction);
         break;
       
       case 'start':
@@ -328,6 +348,92 @@ async function redirectToMainMenuWithError(interaction, errorMessage) {
       // Ignore if interaction expired
     }
   }, 3000);
+}
+
+async function showEditSelector(interaction) {
+  await interaction.deferUpdate();
+
+  try {
+    const raids = await getActiveRaids();
+    const unpostedRaids = raids.filter(r => !r.message_id);
+
+    if (unpostedRaids.length === 0) {
+      return await redirectToMainMenuWithError(interaction, '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited.');
+    }
+
+    const options = unpostedRaids.map(raid => ({
+      label: raid.name,
+      value: raid.id.toString(),
+      description: `${raid.raid_size}-player | ${new Date(raid.start_time).toLocaleString()}`,
+      emoji: '✏️'
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`raid_edit_select_${interaction.user.id}`)
+      .setPlaceholder('Select a preset to edit')
+      .addOptions(options);
+
+    const { ButtonBuilder, ButtonStyle } = require('discord.js');
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: '✏️ **Edit Preset:** Select which preset to edit',
+      embeds: [],
+      components: [row1, row2]
+    });
+  } catch (error) {
+    console.error('Show edit selector error:', error);
+    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+  }
+}
+
+async function showDeleteSelector(interaction) {
+  await interaction.deferUpdate();
+
+  try {
+    const raids = await getActiveRaids();
+    const unpostedRaids = raids.filter(r => !r.message_id);
+
+    if (unpostedRaids.length === 0) {
+      return await redirectToMainMenuWithError(interaction, '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.');
+    }
+
+    const options = unpostedRaids.map(raid => ({
+      label: raid.name,
+      value: raid.id.toString(),
+      description: `${raid.raid_size}-player | ${new Date(raid.start_time).toLocaleString()}`,
+      emoji: '🗑️'
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`raid_delete_select_${interaction.user.id}`)
+      .setPlaceholder('Select a preset to delete')
+      .addOptions(options);
+
+    const { ButtonBuilder, ButtonStyle } = require('discord.js');
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: '🗑️ **Delete Preset:** Select which preset to delete',
+      embeds: [],
+      components: [row1, row2]
+    });
+  } catch (error) {
+    console.error('Show delete selector error:', error);
+    await redirectToMainMenuWithError(interaction, '❌ An error occurred!');
+  }
 }
 
 module.exports = {
