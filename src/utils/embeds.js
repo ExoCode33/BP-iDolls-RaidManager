@@ -90,7 +90,7 @@ async function formatPlayer(registration, isAssist) {
   try {
     const result = await profilePool.query(
       `SELECT ign, class, subclass, ability_score FROM characters WHERE discord_id = $1 AND type = 'main' LIMIT 1`,
-      [registration.discord_id]
+      [registration.user_id]  // ✅ FIXED - use user_id instead of discord_id
     );
     characterData = result.rows[0];
   } catch (err) {
@@ -99,8 +99,8 @@ async function formatPlayer(registration, isAssist) {
 
   // Use data from profile or fallback to registration data
   const ign = characterData?.ign || registration.ign || 'Unknown';
-  const subclass = characterData?.subclass || registration.class_name || '';
-  const score = characterData?.ability_score || registration.combat_power || '';
+  const subclass = characterData?.subclass || registration.subclass || registration.class || '';
+  const score = characterData?.ability_score || registration.ability_score || '';
   
   // Status indicator (green dot for registered)
   const statusDot = '🟢';
