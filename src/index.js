@@ -162,6 +162,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleBackToMain } = require('./events/interactions');
         await handleBackToMain(interaction);
       }
+      // Handle quick action buttons
+      else if (interaction.customId.startsWith('raid_quick_start_')) {
+        const { handleQuickStart } = require('./events/interactions');
+        await handleQuickStart(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_quick_complete_')) {
+        const { handleQuickComplete } = require('./events/interactions');
+        await handleQuickComplete(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_quick_edit_')) {
+        const { handleQuickEdit } = require('./events/interactions');
+        await handleQuickEdit(interaction);
+      }
       // Handle date button
       else if (interaction.customId.startsWith('raid_date_button_')) {
         const { handleDateButton } = require('./events/interactions');
@@ -199,6 +212,26 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleRaidMainMenu } = require('./events/interactions');
         await handleRaidMainMenu(interaction);
       }
+      else if (interaction.customId.startsWith('raid_role_config_')) {
+        const { handleRoleConfigMenu } = require('./events/interactions');
+        await handleRoleConfigMenu(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_preset_menu_')) {
+        const { handlePresetMenu } = require('./events/interactions');
+        await handlePresetMenu(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_lock_menu_')) {
+        const { handleLockMenu } = require('./events/interactions');
+        await handleLockMenu(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_unlock_menu_')) {
+        const { handleUnlockMenu } = require('./events/interactions');
+        await handleUnlockMenu(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_embed_menu_')) {
+        const { handleEmbedMenu } = require('./events/interactions');
+        await handleEmbedMenu(interaction);
+      }
       else if (interaction.customId.startsWith('raid_create_time_')) {
         const { handleTimeSelect } = require('./events/interactions');
         await handleTimeSelect(interaction);
@@ -222,6 +255,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (interaction.customId.startsWith('raid_edit_select_')) {
         const { handleEditSelect } = require('./events/interactions');
         await handleEditSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_edit_raid_select_')) {
+        const { handleEditRaidSelect } = require('./events/interactions');
+        await handleEditRaidSelect(interaction);
       }
       else if (interaction.customId.startsWith('raid_delete_select_')) {
         const { handleDeleteSelect } = require('./events/interactions');
