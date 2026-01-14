@@ -9,17 +9,17 @@ async function createMainMenuEmbed() {
   const raids = await getActiveRaids();
   
   const embed = new EmbedBuilder()
-    .setColor(0xEC4899)
-    .setTitle('🎮 iDolls Raid Manager')
-    .setDescription('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    .setColor(0xEC4899) // Pink color
+    .setTitle('🎮 iDolls Raid Manager');
 
   // Always show active raids
   if (raids.length === 0) {
-    embed.addFields({
-      name: '📋 ACTIVE RAIDS',
-      value: '*No active raids scheduled*',
-      inline: false
-    });
+    embed.setDescription(
+      '**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\n' +
+      '📋 **ACTIVE RAIDS**\n' +
+      '*No active raids scheduled*\n\n' +
+      '**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**'
+    );
   } else {
     let raidsList = '';
     for (const raid of raids) {
@@ -28,20 +28,14 @@ async function createMainMenuEmbed() {
       const posted = raid.message_id ? '✅' : '⏳';
       raidsList += `${status} ${posted} **${raid.name}** • ${raid.raid_size}p • <t:${startTime}:F>\n`;
     }
-    embed.addFields({
-      name: '📋 ACTIVE RAIDS',
-      value: raidsList,
-      inline: false
-    });
+    
+    embed.setDescription(
+      '**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**\n\n' +
+      '📋 **ACTIVE RAIDS**\n' +
+      raidsList + '\n' +
+      '**━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━**'
+    );
   }
-
-  embed.addFields(
-    { 
-      name: '\u200B', 
-      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
-      inline: false 
-    }
-  );
 
   embed.setFooter({ text: '🔒 Locked | 🔓 Open | ✅ Posted | ⏳ Draft' });
   
@@ -212,7 +206,10 @@ async function handleLockUnlockMenu(interaction) {
     }
   } catch (error) {
     console.error('Lock/Unlock menu error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
