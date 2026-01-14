@@ -292,7 +292,11 @@ async function cancelRaid(raidId) {
 
 async function createRaidPost(raid, channel) {
   const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
-  const embed = await createRaidEmbed(raid, []); // ✅ FIXED - ADDED AWAIT
+  
+  // Fetch existing registrations for this raid
+  const registrations = await getRaidRegistrations(raid.id);
+  
+  const embed = await createRaidEmbed(raid, registrations);
   const buttons = createRaidButtons(raid.id, raid.locked);
   
   const message = await channel.send({
