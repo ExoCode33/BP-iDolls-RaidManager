@@ -3,7 +3,18 @@
 // Export all raid-related handlers from one place
 // ═══════════════════════════════════════════════════════════════
 
-const { handleRaidMainMenu, handleBackToMain } = require('./main-menu');
+const { 
+  handleBackToMain,
+  handleRoleConfigMenu,
+  handlePresetMenu,
+  handleLockMenu,
+  handleUnlockMenu,
+  handleEmbedMenu,
+  handleQuickStart,
+  handleQuickComplete,
+  handleQuickEdit,
+  handleEditRaidSelect
+} = require('./main-menu');
 const { showSetupModal, handleSetupModal } = require('./setup-handlers');
 const { 
   startCreateFlow, 
@@ -19,9 +30,17 @@ const { handleRaidAction } = require('./action-handlers');
 const { handleEditSelect, handleDeleteSelect, handleDeleteConfirm } = require('./edit-delete-handlers');
 
 module.exports = {
-  // Main menu
-  handleRaidMainMenu,
+  // Main menu handlers (NEW)
   handleBackToMain,
+  handleRoleConfigMenu,
+  handlePresetMenu,
+  handleLockMenu,
+  handleUnlockMenu,
+  handleEmbedMenu,
+  handleQuickStart,
+  handleQuickComplete,
+  handleQuickEdit,
+  handleEditRaidSelect,
   
   // Setup
   handleSetupModal,
