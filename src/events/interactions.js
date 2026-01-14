@@ -410,8 +410,8 @@ async function handleAdminSelect(interaction) {
       case 'repost':
         const channel = await interaction.client.channels.fetch(raid.channel_id);
         const registrations = await getRaidRegistrations(raidId);
-        const embed = createRaidEmbed(raid, registrations);
-        const buttons = createRaidButtons(raidId);
+        const embed = await createRaidEmbed(raid, registrations);
+        const buttons = createRaidButtons(raidId, raid.locked);
 
         const newMessage = await channel.send({
           embeds: [embed],
@@ -727,8 +727,8 @@ async function updateRaidMessage(raid, client) {
     if (!raid.message_id || !raid.channel_id) return;
 
     const registrations = await getRaidRegistrations(raid.id);
-    const embed = createRaidEmbed(raid, registrations);
-    const buttons = createRaidButtons(raid.id);
+    const embed = await createRaidEmbed(raid, registrations); // ✅ FIXED - ADDED AWAIT
+    const buttons = createRaidButtons(raid.id, raid.locked);
 
     const channel = await client.channels.fetch(raid.channel_id);
     const message = await channel.messages.fetch(raid.message_id);
