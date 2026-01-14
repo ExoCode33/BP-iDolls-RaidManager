@@ -16,6 +16,7 @@ const {
 } = require('./create-handlers');
 const { showStartRaidSelector, handleStartSelect } = require('./start-handlers');
 const { handleRaidAction } = require('./action-handlers');
+const { handleEditSelect, handleDeleteSelect, handleDeleteConfirm } = require('./edit-delete-handlers');
 
 module.exports = {
   // Main menu
@@ -32,6 +33,11 @@ module.exports = {
   handleTimeSelect,
   handleSizeSelect,
   handleChannelSelect,
+  
+  // Edit/Delete
+  handleEditSelect,
+  handleDeleteSelect,
+  handleDeleteConfirm,
   
   // Start
   handleStartSelect,
