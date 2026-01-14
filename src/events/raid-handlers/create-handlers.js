@@ -43,21 +43,28 @@ async function handleNameModal(interaction) {
     state.step = 'date';
     raidCreationState.set(interaction.user.id, state);
 
-    // Show date modal
-    const modal = new ModalBuilder()
-      .setCustomId(`raid_create_date_${interaction.user.id}`)
-      .setTitle('➕ Create Preset - Step 2/5');
+    // Show date input as a text input in the reply (can't show modal from modal)
+    await interaction.editReply({
+      content: `**Step 2/5:** Please enter the date\n**Name:** ${name}\n\nPlease click the button below to enter the date.`
+    });
 
-    const dateInput = new TextInputBuilder()
-      .setCustomId('date')
-      .setLabel('Date (YYYY-MM-DD)')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('2026-01-20')
-      .setRequired(true);
+    // Instead, show a button that will trigger the date modal
+    const dateButton = new ButtonBuilder()
+      .setCustomId(`raid_date_button_${interaction.user.id}`)
+      .setLabel('📅 Enter Date')
+      .setStyle(ButtonStyle.Primary);
 
-    modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back to Main Menu')
+      .setStyle(ButtonStyle.Secondary);
 
-    await interaction.showModal(modal);
+    const row = new ActionRowBuilder().addComponents(dateButton, backButton);
+
+    await interaction.editReply({
+      content: `**Step 2/5:** Enter the date\n**Name:** ${name}\n\nClick the button below to open the date input.`,
+      components: [row]
+    });
   } catch (error) {
     console.error('Name modal error:', error);
     await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
@@ -112,6 +119,35 @@ async function handleDateModal(interaction) {
     console.error('Date modal error:', error);
     await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
   }
+}
+
+async function handleDateButton(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  const state = raidCreationState.get(interaction.user.id);
+  if (!state || !state.name) {
+    return await interaction.reply({
+      content: '❌ Session expired. Please start again with /raid',
+      flags: 64
+    });
+  }
+
+  // Show date modal
+  const modal = new ModalBuilder()
+    .setCustomId(`raid_create_date_${interaction.user.id}`)
+    .setTitle('➕ Create Preset - Step 2/5');
+
+  const dateInput = new TextInputBuilder()
+    .setCustomId('date')
+    .setLabel('Date (YYYY-MM-DD)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('2026-01-20')
+    .setRequired(true);
+
+  modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
+
+  await interaction.showModal(modal);
 }
 
 async function handleTimeSelect(interaction) {
@@ -308,6 +344,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
 module.exports = {
   startCreateFlow,
   handleNameModal,
+  handleDateButton,
   handleDateModal,
   handleTimeSelect,
   handleSizeSelect,
