@@ -40,42 +40,6 @@ async function createMainMenuEmbed() {
       name: '\u200B', 
       value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
       inline: false 
-    },
-    { 
-      name: '⚡ QUICK ACTIONS', 
-      value: '**Buttons:** Post raids • Mark complete • Edit active raids\n' +
-             '**Dropdowns:** Configure settings • Manage presets • Control raids', 
-      inline: false 
-    },
-    { 
-      name: '\u200B', 
-      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
-      inline: false 
-    },
-    {
-      name: '⚙️ ROLE CONFIGURATION',
-      value: 'Set Raid 1 and Raid 2 role IDs',
-      inline: false
-    },
-    {
-      name: '📝 PRESET MANAGEMENT',
-      value: 'Create, edit, or delete raid templates',
-      inline: false
-    },
-    {
-      name: '🔒 LOCK / UNLOCK',
-      value: 'Control raid registrations',
-      inline: false
-    },
-    {
-      name: '📺 EMBED MANAGEMENT',
-      value: 'Refresh or repost raid embeds',
-      inline: false
-    },
-    { 
-      name: '\u200B', 
-      value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
-      inline: false 
     }
   );
 
@@ -309,7 +273,11 @@ async function showEditRaidSelector(interaction) {
     const postedRaids = raids.filter(r => r.message_id);
 
     if (postedRaids.length === 0) {
-      return await redirectToMainMenu(interaction, '❌ No active raids to edit!\n\nOnly posted raids can be edited or cancelled.');
+      await interaction.followUp({
+        content: '❌ No active raids to edit!\n\nOnly posted raids can be edited or cancelled.',
+        ephemeral: true
+      });
+      return;
     }
 
     const options = postedRaids.map(raid => ({
@@ -326,7 +294,7 @@ async function showEditRaidSelector(interaction) {
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
+      .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
@@ -340,7 +308,10 @@ async function showEditRaidSelector(interaction) {
 
   } catch (error) {
     console.error('Show edit raid selector error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
@@ -412,7 +383,11 @@ async function showRaidSelector(interaction, action, title) {
     const postedRaids = raids.filter(r => r.message_id);
 
     if (postedRaids.length === 0) {
-      return await redirectToMainMenu(interaction, `❌ No active raids available for this action!`);
+      await interaction.followUp({
+        content: `❌ No active raids available for this action!`,
+        ephemeral: true
+      });
+      return;
     }
 
     const options = postedRaids.map(raid => ({
@@ -429,7 +404,7 @@ async function showRaidSelector(interaction, action, title) {
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
+      .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
@@ -443,7 +418,10 @@ async function showRaidSelector(interaction, action, title) {
 
   } catch (error) {
     console.error('Show raid selector error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
@@ -455,7 +433,11 @@ async function showEditSelector(interaction) {
     const unpostedRaids = raids.filter(r => !r.message_id);
 
     if (unpostedRaids.length === 0) {
-      return await redirectToMainMenu(interaction, '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited here.');
+      await interaction.followUp({
+        content: '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited here.',
+        ephemeral: true
+      });
+      return;
     }
 
     const options = unpostedRaids.map(raid => ({
@@ -472,7 +454,7 @@ async function showEditSelector(interaction) {
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
+      .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
@@ -486,7 +468,10 @@ async function showEditSelector(interaction) {
 
   } catch (error) {
     console.error('Show edit selector error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
@@ -498,7 +483,11 @@ async function showDeleteSelector(interaction) {
     const unpostedRaids = raids.filter(r => !r.message_id);
 
     if (unpostedRaids.length === 0) {
-      return await redirectToMainMenu(interaction, '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.');
+      await interaction.followUp({
+        content: '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.',
+        ephemeral: true
+      });
+      return;
     }
 
     const options = unpostedRaids.map(raid => ({
@@ -515,7 +504,7 @@ async function showDeleteSelector(interaction) {
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
+      .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Secondary);
 
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
@@ -529,7 +518,10 @@ async function showDeleteSelector(interaction) {
 
   } catch (error) {
     console.error('Show delete selector error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
   }
 }
 
@@ -554,40 +546,18 @@ async function handleBackToMain(interaction) {
 }
 
 async function redirectToMainMenu(interaction, errorMessage) {
-  const embed = await createMainMenuEmbed();
-  const buttonRow = createMainMenuButtons(interaction.user.id);
-  const roleRow = createRoleConfigDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
-  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const embedRow = createEmbedDropdown(interaction.user.id);
-
+  // Just show error, don't rebuild the entire menu
   if (!interaction.deferred && !interaction.replied) {
     await interaction.reply({
       content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow],
-      flags: 64
+      ephemeral: true
     });
   } else {
-    await interaction.editReply({
+    await interaction.followUp({
       content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+      ephemeral: true
     });
   }
-
-  // Auto-remove error message after 3 seconds
-  setTimeout(async () => {
-    try {
-      await interaction.editReply({
-        content: null,
-        embeds: [embed],
-        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
-      });
-    } catch (err) {
-      // Ignore if interaction expired
-    }
-  }, 3000);
 }
 
 module.exports = {
