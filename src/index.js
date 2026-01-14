@@ -90,6 +90,26 @@ ON CONFLICT (key) DO NOTHING;
 
     await eventDB.query(schema);
     console.log('✅ Database migrations completed');
+
+    // Check and add locked column if it doesn't exist (for existing databases)
+    console.log('🔄 Checking for locked column...');
+    const checkColumn = await eventDB.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'raids' AND column_name = 'locked'
+    `);
+
+    if (checkColumn.rows.length === 0) {
+      console.log('📝 Adding locked column to raids table...');
+      await eventDB.query(`
+        ALTER TABLE raids 
+        ADD COLUMN locked BOOLEAN DEFAULT false
+      `);
+      console.log('✅ Successfully added locked column');
+    } else {
+      console.log('✅ Locked column already exists');
+    }
+
   } catch (error) {
     console.error('❌ Migration failed:', error);
   }
@@ -147,6 +167,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handleDateButton } = require('./events/interactions');
         await handleDateButton(interaction);
       }
+      // Handle delete confirm button
+      else if (interaction.customId.startsWith('raid_delete_confirm_')) {
+        const { handleDeleteConfirm } = require('./events/interactions');
+        await handleDeleteConfirm(interaction);
+      }
       else {
         await handleButton(interaction);
       }
@@ -193,6 +218,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
       else if (interaction.customId.startsWith('raid_action_')) {
         const { handleRaidAction } = require('./events/interactions');
         await handleRaidAction(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_edit_select_')) {
+        const { handleEditSelect } = require('./events/interactions');
+        await handleEditSelect(interaction);
+      }
+      else if (interaction.customId.startsWith('raid_delete_select_')) {
+        const { handleDeleteSelect } = require('./events/interactions');
+        await handleDeleteSelect(interaction);
       }
       else {
         // Admin dropdowns and other select menus
