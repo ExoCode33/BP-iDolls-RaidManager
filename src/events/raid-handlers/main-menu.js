@@ -10,7 +10,7 @@ async function createMainMenuEmbed() {
   
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
-    .setTitle('⚔️ **iDolls Raid Manager**'); // Bold title with crossed swords
+    .setTitle('⚔️ **iDolls Raid Manager**');
 
   // Build full ANSI colored description matching the profile bot style
   let ansiContent = '```ansi\n';
@@ -24,6 +24,8 @@ async function createMainMenuEmbed() {
   if (raids.length === 0) {
     ansiContent += '\u001b[0;37mNo active raids scheduled\u001b[0m\n';
   } else {
+    const { getRaidRegistrations } = require('../../database/queries');
+    
     for (const raid of raids) {
       const startTime = new Date(raid.start_time);
       
@@ -39,15 +41,35 @@ async function createMainMenuEmbed() {
       };
       const formattedTime = startTime.toLocaleString('en-US', options) + ' UTC';
       
-      // Only lock status at the end
-      const lockStatus = raid.locked ? '🔒' : '🔓';
+      // Get registrations to count players
+      const registrations = await getRaidRegistrations(raid.id);
+      const registered = registrations.filter(r => r.status === 'registered').length;
+      const waitlist = registrations.filter(r => r.status === 'waitlist').length;
+      
+      // Only lock status at the end (consistent emoji)
+      const lockStatus = raid.locked ? '\u001b[1;31m🔒\u001b[0m' : '\u001b[1;32m🔓\u001b[0m';
       
       // Post status for display
-      const postStatus = raid.message_id ? '✅' : '⏳';
+      const postStatus = raid.message_id ? '\u001b[1;32m✅\u001b[0m' : '\u001b[1;33m⏳\u001b[0m';
       
-      // Raid info (bright blue labels, only lock at end of name)
+      // Player count with color coding
+      let playerCount;
+      const totalWithWaitlist = registered + waitlist;
+      
+      if (totalWithWaitlist > raid.raid_size) {
+        // Overfilled (yellow)
+        playerCount = `\u001b[1;33m[${totalWithWaitlist}/${raid.raid_size}]\u001b[0m`;
+      } else if (registered >= raid.raid_size) {
+        // Full but no overflow (white)
+        playerCount = `\u001b[1;37m[${registered}/${raid.raid_size}]\u001b[0m`;
+      } else {
+        // Not full (green)
+        playerCount = `\u001b[1;32m[${registered}/${raid.raid_size}]\u001b[0m`;
+      }
+      
+      // Raid info (bright blue labels, lock at end of name)
       ansiContent += `${postStatus} \u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m ${lockStatus}\n`;
-      ansiContent += `\u001b[1;34m👥 Size:\u001b[0m \u001b[1;37m${raid.raid_size}p\u001b[0m\n`;
+      ansiContent += `\u001b[1;34m👥 Size:\u001b[0m ${playerCount}\n`;
       ansiContent += `\u001b[1;34m🕐 Time:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
     }
   }
@@ -55,8 +77,8 @@ async function createMainMenuEmbed() {
   // Bold pink line
   ansiContent += '\u001b[1;35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n';
   
-  // Legend
-  ansiContent += '\u001b[1;37m🔒 Locked  🔓 Open  ✅ Posted  ⏳ Draft\u001b[0m\n';
+  // Legend with consistent emojis
+  ansiContent += '\u001b[1;31m🔒\u001b[0m Locked  \u001b[1;32m🔓\u001b[0m Open  \u001b[1;32m✅\u001b[0m Posted  \u001b[1;33m⏳\u001b[0m Draft\n';
   
   ansiContent += '```';
   
