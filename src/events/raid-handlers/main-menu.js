@@ -10,7 +10,7 @@ async function createMainMenuEmbed() {
   
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
-    .setTitle('**🎮 iDolls Raid Manager**'); // Bold white title outside ANSI
+    .setTitle('⚔️ **iDolls Raid Manager**'); // Bold title with crossed swords
 
   // Build full ANSI colored description matching the profile bot style
   let ansiContent = '```ansi\n';
