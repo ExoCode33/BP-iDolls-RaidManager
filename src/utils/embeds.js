@@ -120,7 +120,9 @@ async function formatPlayer(registration, isAssist) {
   if (score) {
     const numScore = parseInt(score);
     if (!isNaN(numScore)) {
-      const lowerBound = Math.floor(numScore / 1000) * 1000;
+      // Round down to nearest 2K interval
+      // e.g., 31000 -> 30000, 32000 -> 32000, 33000 -> 32000
+      const lowerBound = Math.floor(numScore / 2000) * 2000;
       const upperBound = lowerBound + 2000;
       scoreRange = `[${lowerBound/1000}K-${upperBound/1000}K]`;
     } else {
