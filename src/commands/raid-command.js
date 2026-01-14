@@ -11,54 +11,78 @@ module.exports = {
 
     const mainMenu = new StringSelectMenuBuilder()
       .setCustomId(`raid_main_menu_${interaction.user.id}`)
-      .setPlaceholder('🎮 Select a raid action')
+      .setPlaceholder('🎮 Select an action')
       .addOptions([
         {
-          label: '⚙️ Initial Setup',
+          label: '⚙️ Role Setup',
           value: 'setup',
-          description: 'Configure raid roles (one-time setup)',
+          description: 'Configure Raid 1 & Raid 2 roles',
           emoji: '⚙️'
+        },
+        {
+          label: '─────────────────────',
+          value: 'separator1',
+          description: 'PRESET MANAGEMENT',
+          emoji: '📝'
         },
         {
           label: '➕ Create Preset',
           value: 'create',
-          description: 'Create a new raid preset',
+          description: 'Create a new raid template',
           emoji: '➕'
         },
         {
           label: '✏️ Edit Preset',
           value: 'edit',
-          description: 'Edit an existing preset',
+          description: 'Modify an existing preset',
           emoji: '✏️'
         },
         {
           label: '🗑️ Delete Preset',
           value: 'delete',
-          description: 'Delete a preset',
+          description: 'Remove a preset',
           emoji: '🗑️'
         },
         {
-          label: '🚀 Start Raid',
-          value: 'start',
-          description: 'Post raid to channel',
+          label: '─────────────────────',
+          value: 'separator2',
+          description: 'RAID OPERATIONS',
           emoji: '🚀'
         },
         {
-          label: '📋 List Active Raids',
+          label: '📋 View Active Raids',
           value: 'list',
-          description: 'View all active raids',
+          description: 'List all active raids',
           emoji: '📋'
+        },
+        {
+          label: '🎯 Start Raid',
+          value: 'start',
+          description: 'Post a raid to channel',
+          emoji: '🎯'
+        },
+        {
+          label: '🔄 Refresh Embed',
+          value: 'refresh',
+          description: 'Update raid display',
+          emoji: '🔄'
+        },
+        {
+          label: '─────────────────────',
+          value: 'separator3',
+          description: 'QUICK ACTIONS',
+          emoji: '⚡'
         },
         {
           label: '🔒 Lock Raid',
           value: 'lock',
-          description: 'Lock registration (keep unregister)',
+          description: 'Stop new registrations',
           emoji: '🔒'
         },
         {
           label: '🔓 Unlock Raid',
           value: 'unlock',
-          description: 'Unlock registration',
+          description: 'Allow registrations',
           emoji: '🔓'
         },
         {
@@ -76,14 +100,8 @@ module.exports = {
         {
           label: '📝 Repost Embed',
           value: 'repost',
-          description: 'Repost deleted raid embed',
+          description: 'Restore deleted embed',
           emoji: '📝'
-        },
-        {
-          label: '🔄 Refresh Embed',
-          value: 'refresh',
-          description: 'Update raid embed display',
-          emoji: '🔄'
         }
       ]);
 
@@ -92,36 +110,81 @@ module.exports = {
     const embed = new EmbedBuilder()
       .setColor(0xEC4899)
       .setTitle('🎮 Raid Management System')
-      .setDescription('**Select an action from the dropdown below:**\n\n━━━━━━━━━━━━━━━━━━━━━━━━')
+      .setDescription('**Professional raid coordination for your guild**\n\n━━━━━━━━━━━━━━━━━━━━━━━━')
       .addFields(
         { 
-          name: '⚙️ Setup', 
-          value: 'Configure Raid 1 & Raid 2 roles', 
+          name: '\u200B', 
+          value: '**📋 SETUP & CONFIGURATION**', 
+          inline: false 
+        },
+        { 
+          name: '⚙️ Role Setup', 
+          value: 'Configure raid roles', 
           inline: true 
         },
         { 
-          name: '➕ Create Preset', 
-          value: 'Create new raid preset', 
+          name: '\u200B', 
+          value: '\u200B', 
           inline: true 
         },
         { 
-          name: '✏️ Edit | 🗑️ Delete', 
-          value: 'Modify presets', 
+          name: '\u200B', 
+          value: '\u200B', 
           inline: true 
         },
         { 
-          name: '🚀 Start', 
-          value: 'Post raid to channel', 
+          name: '\u200B', 
+          value: '**📝 PRESET MANAGEMENT**', 
+          inline: false 
+        },
+        { 
+          name: '➕ Create', 
+          value: 'New template', 
           inline: true 
         },
         { 
-          name: '📋 List', 
-          value: 'View active raids', 
+          name: '✏️ Edit', 
+          value: 'Modify existing', 
           inline: true 
         },
         { 
-          name: '🔒 Lock/🔓 Unlock', 
-          value: 'Control registration', 
+          name: '🗑️ Delete', 
+          value: 'Remove preset', 
+          inline: true 
+        },
+        { 
+          name: '\u200B', 
+          value: '**🚀 RAID OPERATIONS**', 
+          inline: false 
+        },
+        { 
+          name: '📋 View Raids', 
+          value: 'List all active', 
+          inline: true 
+        },
+        { 
+          name: '🎯 Start Raid', 
+          value: 'Post to channel', 
+          inline: true 
+        },
+        { 
+          name: '🔄 Refresh', 
+          value: 'Update embed', 
+          inline: true 
+        },
+        { 
+          name: '\u200B', 
+          value: '**⚡ QUICK ACTIONS**', 
+          inline: false 
+        },
+        { 
+          name: '🔒 Lock', 
+          value: 'Stop signups', 
+          inline: true 
+        },
+        { 
+          name: '🔓 Unlock', 
+          value: 'Allow signups', 
           inline: true 
         },
         { 
@@ -135,12 +198,17 @@ module.exports = {
           inline: true 
         },
         { 
-          name: '📝 Repost | 🔄 Refresh', 
-          value: 'Update embeds', 
+          name: '📝 Repost', 
+          value: 'Restore embed', 
+          inline: true 
+        },
+        { 
+          name: '\u200B', 
+          value: '\u200B', 
           inline: true 
         }
       )
-      .setFooter({ text: 'All actions are ephemeral (only you can see them)' });
+      .setFooter({ text: 'All actions are private • Select an option below' });
 
     await interaction.editReply({
       embeds: [embed],
