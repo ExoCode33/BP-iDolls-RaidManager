@@ -261,13 +261,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
         const { handlePresetMenu } = require('./events/interactions');
         await handlePresetMenu(interaction);
       }
-      else if (interaction.customId.startsWith('raid_lock_menu_')) {
-        const { handleLockMenu } = require('./events/interactions');
-        await handleLockMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_unlock_menu_')) {
-        const { handleUnlockMenu } = require('./events/interactions');
-        await handleUnlockMenu(interaction);
+      else if (interaction.customId.startsWith('raid_lock_unlock_menu_')) {
+        const { handleLockUnlockMenu } = require('./events/interactions');
+        await handleLockUnlockMenu(interaction);
       }
       else if (interaction.customId.startsWith('raid_embed_menu_')) {
         const { handleEmbedMenu } = require('./events/interactions');
