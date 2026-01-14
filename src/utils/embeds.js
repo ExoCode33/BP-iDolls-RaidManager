@@ -1,5 +1,4 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getUserCharacters } = require('../database/queries');
 
 // ═══════════════════════════════════════════════════════════════
 // RAID EMBED CREATION
@@ -107,28 +106,14 @@ async function createRaidEmbed(raid, registrations) {
 }
 
 async function formatPlayer(registration, isAssist) {
-  // Get player character data using the existing getUserCharacters function
-  let characterData = null;
-  try {
-    const characters = await getUserCharacters(registration.user_id);
-    // Find the main character
-    characterData = characters.find(c => c.type === 'main');
-  } catch (err) {
-    console.error('Error fetching character data:', err);
-  }
-
-  // Use data from profile or fallback to registration data
-  const ign = characterData?.ign || registration.ign || 'Unknown';
-  const subclass = characterData?.subclass || registration.subclass || registration.class || '';
-  const score = characterData?.ability_score || registration.ability_score || '';
+  // Use data directly from registration object
+  const ign = registration.ign || 'Unknown';
+  const className = registration.class || '';
+  const subclass = registration.subclass || '';
+  const score = registration.ability_score || '';
   
-  // Get custom emoji from database (class_emoji field)
-  let classEmoji = characterData?.class_emoji || '';
-  
-  // If no custom emoji in database, fall back to getClassEmoji
-  if (!classEmoji) {
-    classEmoji = getClassEmoji(subclass);
-  }
+  // Get custom emoji using the class name (e.g., "Beat Performer")
+  const classEmoji = getClassEmoji(className);
   
   // Format ability score as range (e.g., 31000 -> "30K-32K")
   let scoreRange = '';
