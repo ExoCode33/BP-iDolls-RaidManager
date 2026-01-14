@@ -14,20 +14,23 @@ const profilePool = new Pool({
 async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899)
-    .setTitle(raid.name)
-    .setDescription(
-      `<t:${Math.floor(new Date(raid.start_time).getTime() / 1000)}:F>\n` +
-      `@Raid ${raid.raid_size === 12 ? '1' : '2'}`
-    );
+    .setTitle(raid.name);
+  
+  // Always set a description, even if minimal
+  const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
+  const raidNumber = raid.raid_size === 12 ? '1' : '2';
+  embed.setDescription(
+    `<t:${timestamp}:F>\n@Raid ${raidNumber}`
+  );
 
   // Separate by role and status
   const registered = registrations.filter(r => r.status === 'registered');
   const waitlist = registrations.filter(r => r.status === 'waitlist');
 
-  // Count by role
-  const tanks = registered.filter(r => r.role === 'tank');
-  const supports = registered.filter(r => r.role === 'support');
-  const dps = registered.filter(r => r.role === 'dps');
+  // Count by role - fix role field to lowercase
+  const tanks = registered.filter(r => r.role && r.role.toLowerCase() === 'tank');
+  const supports = registered.filter(r => r.role && r.role.toLowerCase() === 'support');
+  const dps = registered.filter(r => r.role && r.role.toLowerCase() === 'dps');
 
   // Tank section (0/2)
   const tankMax = 2;
@@ -35,7 +38,12 @@ async function createRaidEmbed(raid, registrations) {
   if (tanks.length === 0) {
     tankText = '*Empty*';
   } else {
-    tankText = (await Promise.all(tanks.map(t => formatPlayer(t, false)))).join('\n');
+    try {
+      tankText = (await Promise.all(tanks.map(t => formatPlayer(t, false)))).join('\n');
+    } catch (err) {
+      console.error('Error formatting tanks:', err);
+      tankText = tanks.map(t => `🟢 ${t.ign}`).join('\n');
+    }
   }
   embed.addFields({ 
     name: `Tank (${tanks.length}/${tankMax}):`, 
@@ -49,7 +57,12 @@ async function createRaidEmbed(raid, registrations) {
   if (supports.length === 0) {
     supportText = '*Empty*';
   } else {
-    supportText = (await Promise.all(supports.map(s => formatPlayer(s, false)))).join('\n');
+    try {
+      supportText = (await Promise.all(supports.map(s => formatPlayer(s, false)))).join('\n');
+    } catch (err) {
+      console.error('Error formatting supports:', err);
+      supportText = supports.map(s => `🟢 ${s.ign}`).join('\n');
+    }
   }
   embed.addFields({ 
     name: `Support (${supports.length}/${supportMax}):`, 
@@ -63,7 +76,12 @@ async function createRaidEmbed(raid, registrations) {
   if (dps.length === 0) {
     dpsText = '*Empty*';
   } else {
-    dpsText = (await Promise.all(dps.map(d => formatPlayer(d, false)))).join('\n');
+    try {
+      dpsText = (await Promise.all(dps.map(d => formatPlayer(d, false)))).join('\n');
+    } catch (err) {
+      console.error('Error formatting dps:', err);
+      dpsText = dps.map(d => `🟢 ${d.ign}`).join('\n');
+    }
   }
   embed.addFields({ 
     name: `DPS (${dps.length}/${dpsMax}):`, 
@@ -73,12 +91,22 @@ async function createRaidEmbed(raid, registrations) {
 
   // Waitlist section (Assist)
   if (waitlist.length > 0) {
-    const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
-    embed.addFields({ 
-      name: `⏳ Waitlist (${waitlist.length}):`, 
-      value: waitlistText, 
-      inline: false 
-    });
+    try {
+      const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
+      embed.addFields({ 
+        name: `⏳ Waitlist (${waitlist.length}):`, 
+        value: waitlistText, 
+        inline: false 
+      });
+    } catch (err) {
+      console.error('Error formatting waitlist:', err);
+      const waitlistText = waitlist.map(w => `🟢 ${w.ign} [Assist]`).join('\n');
+      embed.addFields({ 
+        name: `⏳ Waitlist (${waitlist.length}):`, 
+        value: waitlistText, 
+        inline: false 
+      });
+    }
   }
 
   return embed;
