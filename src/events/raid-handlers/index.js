@@ -7,7 +7,8 @@ const { handleRaidMainMenu, handleBackToMain } = require('./main-menu');
 const { showSetupModal, handleSetupModal } = require('./setup-handlers');
 const { 
   startCreateFlow, 
-  handleNameModal, 
+  handleNameModal,
+  handleDateButton,
   handleDateModal, 
   handleTimeSelect, 
   handleSizeSelect, 
@@ -26,6 +27,7 @@ module.exports = {
   
   // Create flow
   handleNameModal,
+  handleDateButton,
   handleDateModal,
   handleTimeSelect,
   handleSizeSelect,
