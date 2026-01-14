@@ -38,6 +38,17 @@ CREATE TABLE IF NOT EXISTS bot_config (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS raid_presets (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  raid_size INTEGER NOT NULL CHECK (raid_size IN (12, 20)),
+  time_utc VARCHAR(5) NOT NULL,
+  channel_id VARCHAR(20) NOT NULL,
+  created_by VARCHAR(20) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS raids (
   id SERIAL PRIMARY KEY,
   name VARCHAR(200) NOT NULL,
@@ -54,7 +65,8 @@ CREATE TABLE IF NOT EXISTS raids (
   created_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
   reminded_30m BOOLEAN DEFAULT false,
-  locked BOOLEAN DEFAULT false
+  locked BOOLEAN DEFAULT false,
+  preset_id INTEGER REFERENCES raid_presets(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS raid_registrations (
@@ -74,9 +86,11 @@ CREATE TABLE IF NOT EXISTS raid_registrations (
   UNIQUE(raid_id, user_id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_presets_created_by ON raid_presets(created_by);
 CREATE INDEX IF NOT EXISTS idx_raids_status ON raids(status);
 CREATE INDEX IF NOT EXISTS idx_raids_slot_status ON raids(raid_slot, status);
 CREATE INDEX IF NOT EXISTS idx_raids_start_time ON raids(start_time);
+CREATE INDEX IF NOT EXISTS idx_raids_preset_id ON raids(preset_id);
 CREATE INDEX IF NOT EXISTS idx_reg_raid_id ON raid_registrations(raid_id);
 CREATE INDEX IF NOT EXISTS idx_reg_user_id ON raid_registrations(user_id);
 CREATE INDEX IF NOT EXISTS idx_reg_raid_role_status ON raid_registrations(raid_id, role, status);
@@ -93,13 +107,13 @@ ON CONFLICT (key) DO NOTHING;
 
     // Check and add locked column if it doesn't exist (for existing databases)
     console.log('🔄 Checking for locked column...');
-    const checkColumn = await eventDB.query(`
+    const checkLocked = await eventDB.query(`
       SELECT column_name 
       FROM information_schema.columns 
       WHERE table_name = 'raids' AND column_name = 'locked'
     `);
 
-    if (checkColumn.rows.length === 0) {
+    if (checkLocked.rows.length === 0) {
       console.log('📝 Adding locked column to raids table...');
       await eventDB.query(`
         ALTER TABLE raids 
@@ -108,6 +122,25 @@ ON CONFLICT (key) DO NOTHING;
       console.log('✅ Successfully added locked column');
     } else {
       console.log('✅ Locked column already exists');
+    }
+
+    // Check and add preset_id column if it doesn't exist
+    console.log('🔄 Checking for preset_id column...');
+    const checkPresetId = await eventDB.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'raids' AND column_name = 'preset_id'
+    `);
+
+    if (checkPresetId.rows.length === 0) {
+      console.log('📝 Adding preset_id column to raids table...');
+      await eventDB.query(`
+        ALTER TABLE raids 
+        ADD COLUMN preset_id INTEGER REFERENCES raid_presets(id) ON DELETE SET NULL
+      `);
+      console.log('✅ Successfully added preset_id column');
+    } else {
+      console.log('✅ Preset_id column already exists');
     }
 
   } catch (error) {
