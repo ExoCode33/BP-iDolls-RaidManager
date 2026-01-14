@@ -1,122 +1,248 @@
 const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { getClassEmoji, getPowerColor } = require('./formatters');
+const { Pool } = require('pg');
 
-function createRaidEmbed(raid, registrations) {
-  const { registered, assist, waitlist } = categorizeRegistrations(registrations);
+// Profile database connection
+const profilePool = new Pool({
+  connectionString: process.env.PROFILE_BOT_DB_URL || process.env.EVENT_BOT_DB_URL,
+  ssl: false
+});
 
-  const tankRegistered = registered.filter(r => r.role === 'Tank');
-  const supportRegistered = registered.filter(r => r.role === 'Support');
-  const dpsRegistered = registered.filter(r => r.role === 'DPS');
+// ═══════════════════════════════════════════════════════════════
+// RAID EMBED CREATION
+// ═══════════════════════════════════════════════════════════════
 
-  const tankAssist = assist.filter(r => r.role === 'Tank');
-  const supportAssist = assist.filter(r => r.role === 'Support');
-  const dpsAssist = assist.filter(r => r.role === 'DPS');
-
+async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
-    .setColor(0xEC4899) // Pink color
-    .setTitle(`${raid.name}`)
-    .setDescription(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n<t:${Math.floor(new Date(raid.start_time).getTime() / 1000)}:F>\n<@&${raid.main_role_id}>`);
+    .setColor(0xEC4899)
+    .setTitle(raid.name)
+    .setDescription(
+      `<t:${Math.floor(new Date(raid.start_time).getTime() / 1000)}:F>\n` +
+      `@Raid ${raid.raid_size === 12 ? '1' : '2'}`
+    );
 
-  // Tank Section
-  let tankText = `**Tank (${tankRegistered.length}/${raid.tank_slots}):**\n`;
-  tankText += formatRoleSection(tankRegistered, raid.tank_slots);
-  if (tankAssist.length > 0) {
-    tankText += `\n*Assist:*\n${formatRoleSection(tankAssist, 0)}`;
+  // Separate by role and status
+  const registered = registrations.filter(r => r.status === 'registered');
+  const waitlist = registrations.filter(r => r.status === 'waitlist');
+
+  // Count by role
+  const tanks = registered.filter(r => r.role === 'tank');
+  const supports = registered.filter(r => r.role === 'support');
+  const dps = registered.filter(r => r.role === 'dps');
+
+  // Tank section (0/2)
+  const tankMax = 2;
+  let tankText = '';
+  if (tanks.length === 0) {
+    tankText = '*Empty*';
+  } else {
+    tankText = (await Promise.all(tanks.map(t => formatPlayer(t, false)))).join('\n');
   }
-
-  // Support Section  
-  let supportText = `**Support (${supportRegistered.length}/${raid.support_slots}):**\n`;
-  supportText += formatRoleSection(supportRegistered, raid.support_slots);
-  if (supportAssist.length > 0) {
-    supportText += `\n*Assist:*\n${formatRoleSection(supportAssist, 0)}`;
-  }
-
-  // DPS Section
-  let dpsText = `**DPS (${dpsRegistered.length}/${raid.dps_slots}):**\n`;
-  dpsText += formatRoleSection(dpsRegistered, raid.dps_slots);
-  if (dpsAssist.length > 0) {
-    dpsText += `\n*Assist:*\n${formatRoleSection(dpsAssist, 0)}`;
-  }
-
-  embed.addFields(
-    { name: '\u200b', value: tankText, inline: false },
-    { name: '\u200b', value: supportText, inline: false },
-    { name: '\u200b', value: dpsText, inline: false }
-  );
-
-  // Waitlist
-  if (waitlist.length > 0) {
-    let waitlistText = waitlist.map(reg => {
-      const powerColor = getPowerColor(reg.ability_score);
-      const classEmoji = getClassEmoji(reg.class);
-      return `${powerColor} <@${reg.user_id}> - ${reg.ign} ${classEmoji}`;
-    }).join('\n');
-    
-    embed.addFields({ name: '**Waitlist:**', value: waitlistText, inline: false });
-  }
-
   embed.addFields({ 
-    name: '\u200b', 
-    value: '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 
+    name: `Tank (${tanks.length}/${tankMax}):`, 
+    value: tankText, 
     inline: false 
   });
 
-  // Add lock indicator if raid is locked
-  if (raid.locked) {
-    embed.setFooter({ text: '🔒 Registration Locked' });
+  // Support section (1/2)
+  const supportMax = 2;
+  let supportText = '';
+  if (supports.length === 0) {
+    supportText = '*Empty*';
+  } else {
+    supportText = (await Promise.all(supports.map(s => formatPlayer(s, false)))).join('\n');
+  }
+  embed.addFields({ 
+    name: `Support (${supports.length}/${supportMax}):`, 
+    value: supportText, 
+    inline: false 
+  });
+
+  // DPS section (0/8)
+  const dpsMax = raid.raid_size - 4; // Total minus tanks and supports
+  let dpsText = '';
+  if (dps.length === 0) {
+    dpsText = '*Empty*';
+  } else {
+    dpsText = (await Promise.all(dps.map(d => formatPlayer(d, false)))).join('\n');
+  }
+  embed.addFields({ 
+    name: `DPS (${dps.length}/${dpsMax}):`, 
+    value: dpsText, 
+    inline: false 
+  });
+
+  // Waitlist section (Assist)
+  if (waitlist.length > 0) {
+    const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
+    embed.addFields({ 
+      name: `⏳ Waitlist (${waitlist.length}):`, 
+      value: waitlistText, 
+      inline: false 
+    });
   }
 
   return embed;
 }
 
-function formatRoleSection(registrations, maxSlots) {
-  if (registrations.length === 0) {
-    return '*Empty*';
-  }
-
-  return registrations.map((reg, index) => {
-    const powerColor = getPowerColor(reg.ability_score);
-    const classEmoji = getClassEmoji(reg.class);
-    return `${powerColor} <@${reg.user_id}> - ${reg.ign} ${classEmoji}`;
-  }).join('\n');
-}
-
-function categorizeRegistrations(registrations) {
-  return {
-    registered: registrations.filter(r => r.status === 'registered'),
-    assist: registrations.filter(r => r.status === 'assist'),
-    waitlist: registrations.filter(r => r.status === 'waitlist')
-  };
-}
-
-function createRaidButtons(raidId, isLocked = false) {
-  const row = new ActionRowBuilder();
-
-  if (!isLocked) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`register_${raidId}`)
-        .setLabel('Register')
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`assist_${raidId}`)
-        .setLabel('I can help')
-        .setStyle(ButtonStyle.Primary)
+async function formatPlayer(registration, isAssist) {
+  // Get player character data from profile database
+  let characterData = null;
+  try {
+    const result = await profilePool.query(
+      `SELECT ign, class, subclass, ability_score FROM characters WHERE discord_id = $1 AND type = 'main' LIMIT 1`,
+      [registration.discord_id]
     );
+    characterData = result.rows[0];
+  } catch (err) {
+    console.error('Error fetching character data:', err);
   }
 
-  row.addComponents(
-    new ButtonBuilder()
-      .setCustomId(`unregister_${raidId}`)
-      .setLabel('Unregister')
-      .setStyle(ButtonStyle.Danger)
-  );
+  // Use data from profile or fallback to registration data
+  const ign = characterData?.ign || registration.ign || 'Unknown';
+  const subclass = characterData?.subclass || registration.class_name || '';
+  const score = characterData?.ability_score || registration.combat_power || '';
+  
+  // Status indicator (green dot for registered)
+  const statusDot = '🟢';
+  
+  // Class emoji based on subclass name
+  const classEmoji = getClassEmoji(subclass);
+  
+  // Build format: 🟢 IGN • Subclass 🎯 [30-32k] [Assist]
+  let formatted = `${statusDot} ${ign}`;
+  
+  if (subclass) {
+    formatted += ` • ${subclass}`;
+  }
+  
+  if (classEmoji) {
+    formatted += ` ${classEmoji}`;
+  }
+  
+  if (score) {
+    formatted += ` [${score}]`;
+  }
+  
+  if (isAssist) {
+    formatted += ` [Assist]`;
+  }
+  
+  return formatted;
+}
 
-  return row;
+function getClassEmoji(subclassName) {
+  if (!subclassName) return '';
+  
+  const subclassLower = subclassName.toLowerCase();
+  
+  // Map class names to custom emoji IDs
+  const customEmojiMap = {
+    'beatperformer': '<:BeatPerformer:1460272597538181254>',
+    'beat performer': '<:BeatPerformer:1460272597538181254>',
+    'frostmage': '<:FrostMage:1460272596523159695>',
+    'frost mage': '<:FrostMage:1460272596523159695>',
+    'heavyguardian': '<:HeavyGuardian:1460272595264995458>',
+    'heavy guardian': '<:HeavyGuardian:1460272595264995458>',
+    'marksman': '<:Marksman:1460272594275012671>',
+    'shieldknight': '<:ShieldKnight:1460272593306255465>',
+    'shield knight': '<:ShieldKnight:1460272593306255465>',
+    'stormblade': '<:StormBlade:1460272591473348618>',
+    'storm blade': '<:StormBlade:1460272591473348618>',
+    'verdantoracle': '<:VerdantOracle:1460272589296504916>',
+    'verdant oracle': '<:VerdantOracle:1460272589296504916>',
+    'windknight': '<:WindKnight:1460272587799138428>',
+    'wind knight': '<:WindKnight:1460272587799138428>'
+  };
+  
+  // Remove spaces and check for exact match
+  const normalizedName = subclassLower.replace(/\s+/g, '');
+  if (customEmojiMap[normalizedName]) {
+    return customEmojiMap[normalizedName];
+  }
+  
+  // Check with spaces
+  if (customEmojiMap[subclassLower]) {
+    return customEmojiMap[subclassLower];
+  }
+  
+  // Subclass emoji map (for all subclasses)
+  const subclassEmojiMap = {
+    // Beat Performer subclasses
+    'dissonance': '🎭',
+    'concerto': '🎵',
+    
+    // Frost Mage subclasses
+    'icicle': '❄️',
+    'frostbeam': '🧊',
+    
+    // Heavy Guardian subclasses
+    'earthfort': '🛡️',
+    'block': '🛡️',
+    
+    // Marksman subclasses
+    'wildpack': '🏹',
+    'falconry': '🦅',
+    
+    // Shield Knight subclasses
+    'recovery': '💚',
+    'shield': '🛡️',
+    
+    // Stormblade subclasses
+    'iaido slash': '⚡',
+    'iaido': '⚡',
+    'moonstrike': '🌙',
+    
+    // Verdant Oracle subclasses
+    'smite': '✨',
+    'lifebind': '💚',
+    
+    // Wind Knight subclasses
+    'vanguard': '⚔️',
+    'skyward': '🌪️'
+  };
+  
+  // Check for subclass names
+  for (const [key, emoji] of Object.entries(subclassEmojiMap)) {
+    if (subclassLower.includes(key)) {
+      return emoji;
+    }
+  }
+  
+  return '⚔️'; // Default emoji
+}
+
+// ═══════════════════════════════════════════════════════════════
+// RAID BUTTONS CREATION
+// ═══════════════════════════════════════════════════════════════
+
+function createRaidButtons(raidId, isLocked) {
+  const registerButton = new ButtonBuilder()
+    .setCustomId(`register_${raidId}`)
+    .setLabel('Register')
+    .setStyle(ButtonStyle.Success)
+    .setDisabled(isLocked);
+
+  const helpButton = new ButtonBuilder()
+    .setCustomId(`help_${raidId}`)
+    .setLabel('I can help')
+    .setStyle(ButtonStyle.Primary)
+    .setDisabled(isLocked);
+
+  const unregisterButton = new ButtonBuilder()
+    .setCustomId(`unregister_${raidId}`)
+    .setLabel('Unregister')
+    .setStyle(ButtonStyle.Danger);
+
+  return new ActionRowBuilder().addComponents(
+    registerButton,
+    helpButton,
+    unregisterButton
+  );
 }
 
 module.exports = {
   createRaidEmbed,
   createRaidButtons,
-  categorizeRegistrations
+  formatPlayer,
+  getClassEmoji
 };
