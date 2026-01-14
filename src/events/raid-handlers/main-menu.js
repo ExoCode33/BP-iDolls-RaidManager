@@ -274,7 +274,7 @@ async function showEditRaidSelector(interaction) {
 
     if (postedRaids.length === 0) {
       await interaction.followUp({
-        content: '❌ No active raids to edit!\n\nOnly posted raids can be edited or cancelled.',
+        content: '❌ No active raids to edit!',
         ephemeral: true
       });
       return;
@@ -300,9 +300,12 @@ async function showEditRaidSelector(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // KEEP the main embed, only change components
+    const embed = await createMainMenuEmbed();
+
     await interaction.editReply({
-      content: '✏️ **Edit Raid:** Select which raid to modify or cancel',
-      embeds: [],
+      content: null,
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -384,7 +387,7 @@ async function showRaidSelector(interaction, action, title) {
 
     if (postedRaids.length === 0) {
       await interaction.followUp({
-        content: `❌ No active raids available for this action!`,
+        content: `❌ No active raids available!`,
         ephemeral: true
       });
       return;
@@ -399,7 +402,7 @@ async function showRaidSelector(interaction, action, title) {
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`raid_action_select_${action}_${interaction.user.id}`)
-      .setPlaceholder(`Select a raid`)
+      .setPlaceholder(title)
       .addOptions(options);
 
     const backButton = new ButtonBuilder()
@@ -410,9 +413,12 @@ async function showRaidSelector(interaction, action, title) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // KEEP the main embed, only change components
+    const embed = await createMainMenuEmbed();
+
     await interaction.editReply({
-      content: `${title}`,
-      embeds: [],
+      content: null,
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -434,7 +440,7 @@ async function showEditSelector(interaction) {
 
     if (unpostedRaids.length === 0) {
       await interaction.followUp({
-        content: '❌ No presets available to edit!\n\nOnly unposted raids (presets) can be edited here.',
+        content: '❌ No presets available to edit!',
         ephemeral: true
       });
       return;
@@ -460,9 +466,12 @@ async function showEditSelector(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // KEEP the main embed, only change components
+    const embed = await createMainMenuEmbed();
+
     await interaction.editReply({
-      content: '✏️ **Edit Preset:** Select which preset to edit',
-      embeds: [],
+      content: null,
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -484,7 +493,7 @@ async function showDeleteSelector(interaction) {
 
     if (unpostedRaids.length === 0) {
       await interaction.followUp({
-        content: '❌ No presets available to delete!\n\nOnly unposted raids (presets) can be deleted.',
+        content: '❌ No presets available to delete!',
         ephemeral: true
       });
       return;
@@ -510,9 +519,12 @@ async function showDeleteSelector(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // KEEP the main embed, only change components
+    const embed = await createMainMenuEmbed();
+
     await interaction.editReply({
-      content: '🗑️ **Delete Preset:** Select which preset to delete',
-      embeds: [],
+      content: null,
+      embeds: [embed],
       components: [row1, row2]
     });
 
