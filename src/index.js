@@ -65,8 +65,7 @@ CREATE TABLE IF NOT EXISTS raids (
   created_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
   reminded_30m BOOLEAN DEFAULT false,
-  locked BOOLEAN DEFAULT false,
-  preset_id INTEGER REFERENCES raid_presets(id) ON DELETE SET NULL
+  locked BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS raid_registrations (
@@ -90,7 +89,6 @@ CREATE INDEX IF NOT EXISTS idx_presets_created_by ON raid_presets(created_by);
 CREATE INDEX IF NOT EXISTS idx_raids_status ON raids(status);
 CREATE INDEX IF NOT EXISTS idx_raids_slot_status ON raids(raid_slot, status);
 CREATE INDEX IF NOT EXISTS idx_raids_start_time ON raids(start_time);
-CREATE INDEX IF NOT EXISTS idx_raids_preset_id ON raids(preset_id);
 CREATE INDEX IF NOT EXISTS idx_reg_raid_id ON raid_registrations(raid_id);
 CREATE INDEX IF NOT EXISTS idx_reg_user_id ON raid_registrations(user_id);
 CREATE INDEX IF NOT EXISTS idx_reg_raid_role_status ON raid_registrations(raid_id, role, status);
@@ -139,8 +137,18 @@ ON CONFLICT (key) DO NOTHING;
         ADD COLUMN preset_id INTEGER REFERENCES raid_presets(id) ON DELETE SET NULL
       `);
       console.log('✅ Successfully added preset_id column');
+      
+      // Create index for preset_id
+      await eventDB.query(`
+        CREATE INDEX IF NOT EXISTS idx_raids_preset_id ON raids(preset_id)
+      `);
+      console.log('✅ Successfully created preset_id index');
     } else {
       console.log('✅ Preset_id column already exists');
+      // Ensure index exists even if column already exists
+      await eventDB.query(`
+        CREATE INDEX IF NOT EXISTS idx_raids_preset_id ON raids(preset_id)
+      `);
     }
 
   } catch (error) {
