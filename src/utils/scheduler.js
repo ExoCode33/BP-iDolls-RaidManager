@@ -32,6 +32,12 @@ function startReminderScheduler(client) {
           // Skip already locked raids
           if (raid.locked) return false;
           
+          // ✅ FIX - Skip raids that haven't been posted yet
+          if (!raid.message_id) {
+            console.log(`⏭️ Skipping auto-lock for raid ${raid.id} - not posted yet`);
+            return false;
+          }
+          
           const raidStartTime = new Date(raid.start_time);
           const timeUntilRaid = raidStartTime - currentTime;
           const hoursUntilRaid = timeUntilRaid / (60 * 60 * 1000);
@@ -267,6 +273,9 @@ function startReminderScheduler(client) {
         
         const raidsNeedingLock = activeRaids.filter(raid => {
           if (raid.locked) return false;
+          
+          // ✅ FIX - Skip raids that haven't been posted yet
+          if (!raid.message_id) return false;
           
           const raidStartTime = new Date(raid.start_time);
           const timeUntilRaid = raidStartTime - now;
