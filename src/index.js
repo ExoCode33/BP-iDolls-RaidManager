@@ -2,8 +2,42 @@ require('dotenv').config();
 const { Client, GatewayIntentBits, Collection, Events, REST, Routes } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
-const { startReminderScheduler } = require('./utils/scheduler');
-const { handleButton, handleManualModal } = require('./events/interactions');
+const { startReminderScheduler, getSchedulerHealth } = require('./utils/scheduler');
+const { checkMainDBHealth, checkEventDBHealth, getPoolStats } = require('./database/connection');
+
+// Import all interaction handlers
+const { 
+  handleButton, 
+  handleCharacterSelect,
+  handleManualClassSelect,
+  handleManualSubclassSelect,
+  handleManualScoreSelect,
+  handleManualIGNModal,
+  handleManualBackToClass,
+  handleManualBackToSubclass,
+  handleBackToMain,
+  handleQuickStart,
+  handleQuickComplete,
+  handleQuickEdit,
+  handleDateButton,
+  handleDeleteConfirm,
+  handleRaidMainMenu,
+  handleRoleConfigMenu,
+  handlePresetMenu,
+  handleLockUnlockMenu,
+  handleEmbedMenu,
+  handleTimeSelect,
+  handleSizeSelect,
+  handleChannelSelect,
+  handleStartSelect,
+  handleRaidAction,
+  handleEditSelect,
+  handleEditRaidSelect,
+  handleDeleteSelect,
+  handleSetupModal,
+  handleNameModal,
+  handleDateModal
+} = require('./events/interactions');
 
 const client = new Client({
   intents: [
@@ -63,6 +97,7 @@ CREATE TABLE IF NOT EXISTS raids (
   raid_slot INTEGER NOT NULL CHECK (raid_slot IN (1, 2)),
   created_by VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
   reminded_30m BOOLEAN DEFAULT false,
   locked BOOLEAN DEFAULT false
@@ -80,7 +115,7 @@ CREATE TABLE IF NOT EXISTS raid_registrations (
   ability_score INTEGER NOT NULL,
   role VARCHAR(20) NOT NULL CHECK (role IN ('Tank', 'DPS', 'Support')),
   registration_type VARCHAR(20) DEFAULT 'register' CHECK (registration_type IN ('register', 'assist')),
-  status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist')),
+  status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist', 'assist')),
   registered_at TIMESTAMP DEFAULT NOW(),
   UNIQUE(raid_id, user_id)
 );
@@ -151,6 +186,23 @@ ON CONFLICT (key) DO NOTHING;
       `);
     }
 
+    // ✅ NEW - Add updated_at column to raids if missing
+    console.log('🔄 Checking for updated_at column...');
+    const checkUpdatedAt = await eventDB.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'raids' AND column_name = 'updated_at'
+    `);
+
+    if (checkUpdatedAt.rows.length === 0) {
+      console.log('📝 Adding updated_at column to raids table...');
+      await eventDB.query(`
+        ALTER TABLE raids 
+        ADD COLUMN updated_at TIMESTAMP DEFAULT NOW()
+      `);
+      console.log('✅ Successfully added updated_at column');
+    }
+
   } catch (error) {
     console.error('❌ Migration failed:', error);
   }
@@ -187,173 +239,216 @@ client.once(Events.ClientReady, async (c) => {
   await deployCommands();
   
   startReminderScheduler(client);
+  
+  // ✅ NEW - Log initial health status
+  setTimeout(async () => {
+    const mainHealth = await checkMainDBHealth();
+    const eventHealth = await checkEventDBHealth();
+    const poolStats = await getPoolStats();
+    const schedulerHealth = getSchedulerHealth();
+    
+    console.log('📊 Initial Health Check:', {
+      mainDB: mainHealth ? '✅' : '❌',
+      eventDB: eventHealth ? '✅' : '❌',
+      scheduler: schedulerHealth.isHealthy ? '✅' : '❌',
+      pools: poolStats
+    });
+  }, 3000);
 });
 
+// ✅ IMPROVED - Better interaction routing with error handling
+const INTERACTION_HANDLERS = {
+  button: {
+    'raid_back_to_main_': handleBackToMain,
+    'raid_quick_start_': handleQuickStart,
+    'raid_quick_complete_': handleQuickComplete,
+    'raid_quick_edit_': handleQuickEdit,
+    'raid_date_button_': handleDateButton,
+    'raid_delete_confirm_': handleDeleteConfirm,
+  },
+  selectMenu: {
+    'char_select_': handleCharacterSelect,
+    'manual_select_class_': handleManualClassSelect,
+    'manual_select_subclass_': handleManualSubclassSelect,
+    'manual_select_score_': handleManualScoreSelect,
+    'raid_main_menu_': handleRaidMainMenu,
+    'raid_role_config_': handleRoleConfigMenu,
+    'raid_preset_menu_': handlePresetMenu,
+    'raid_lock_unlock_menu_': handleLockUnlockMenu,
+    'raid_embed_menu_': handleEmbedMenu,
+    'raid_create_time_': handleTimeSelect,
+    'raid_create_size_': handleSizeSelect,
+    'raid_create_channel_': handleChannelSelect,
+    'raid_start_select_': handleStartSelect,
+    'raid_action_': handleRaidAction,
+    'raid_edit_select_': handleEditSelect,
+    'raid_edit_raid_select_': handleEditRaidSelect,
+    'raid_delete_select_': handleDeleteSelect,
+  },
+  modal: {
+    'manual_ign_modal_': handleManualIGNModal,
+    'raid_setup_modal_': handleSetupModal,
+    'raid_create_name_': handleNameModal,
+    'raid_create_date_': handleDateModal,
+  }
+};
 
 client.on(Events.InteractionCreate, async (interaction) => {
+  const interactionId = `${interaction.user.id}-${interaction.id}`;
+  
   try {
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
-      if (!command) return;
+      if (!command) {
+        console.warn(`Command not found: ${interaction.commandName}`);
+        return;
+      }
+      
+      console.log(`[CMD] ${interaction.user.tag} used /${interaction.commandName}`);
       await command.execute(interaction);
-    } 
-    else if (interaction.isButton()) {
-      // Handle back to main menu button
-      if (interaction.customId.startsWith('raid_back_to_main_')) {
-        const { handleBackToMain } = require('./events/interactions');
-        await handleBackToMain(interaction);
+      
+    } else if (interaction.isButton()) {
+      console.log(`[BTN] ${interaction.user.tag} clicked ${interaction.customId}`);
+      
+      // Try to find matching handler
+      let handled = false;
+      for (const [prefix, handler] of Object.entries(INTERACTION_HANDLERS.button)) {
+        if (interaction.customId.startsWith(prefix)) {
+          await handler(interaction);
+          handled = true;
+          break;
+        }
       }
-      // Handle quick action buttons
-      else if (interaction.customId.startsWith('raid_quick_start_')) {
-        const { handleQuickStart } = require('./events/interactions');
-        await handleQuickStart(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_quick_complete_')) {
-        const { handleQuickComplete } = require('./events/interactions');
-        await handleQuickComplete(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_quick_edit_')) {
-        const { handleQuickEdit } = require('./events/interactions');
-        await handleQuickEdit(interaction);
-      }
-      // Handle date button
-      else if (interaction.customId.startsWith('raid_date_button_')) {
-        const { handleDateButton } = require('./events/interactions');
-        await handleDateButton(interaction);
-      }
-      // Handle delete confirm button
-      else if (interaction.customId.startsWith('raid_delete_confirm_')) {
-        const { handleDeleteConfirm } = require('./events/interactions');
-        await handleDeleteConfirm(interaction);
-      }
-      else {
+      
+      // Fallback to generic button handler
+      if (!handled) {
         await handleButton(interaction);
       }
-    }
-    else if (interaction.isStringSelectMenu()) {
-      // Route select menus correctly
-      if (interaction.customId.startsWith('char_select_')) {
-        const { handleCharacterSelect } = require('./events/interactions');
-        await handleCharacterSelect(interaction);
-      } 
-      else if (interaction.customId.startsWith('manual_select_class_')) {
-        const { handleManualClassSelect } = require('./events/interactions');
-        await handleManualClassSelect(interaction);
+      
+    } else if (interaction.isStringSelectMenu()) {
+      console.log(`[MENU] ${interaction.user.tag} selected from ${interaction.customId}`);
+      
+      // Try to find matching handler
+      let handled = false;
+      for (const [prefix, handler] of Object.entries(INTERACTION_HANDLERS.selectMenu)) {
+        if (interaction.customId.startsWith(prefix)) {
+          await handler(interaction);
+          handled = true;
+          break;
+        }
       }
-      else if (interaction.customId.startsWith('manual_select_subclass_')) {
-        const { handleManualSubclassSelect } = require('./events/interactions');
-        await handleManualSubclassSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('manual_select_score_')) {
-        const { handleManualScoreSelect } = require('./events/interactions');
-        await handleManualScoreSelect(interaction);
-      }
-      // Raid menu handlers
-      else if (interaction.customId.startsWith('raid_main_menu_')) {
-        const { handleRaidMainMenu } = require('./events/interactions');
-        await handleRaidMainMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_role_config_')) {
-        const { handleRoleConfigMenu } = require('./events/interactions');
-        await handleRoleConfigMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_preset_menu_')) {
-        const { handlePresetMenu } = require('./events/interactions');
-        await handlePresetMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_lock_unlock_menu_')) {
-        const { handleLockUnlockMenu } = require('./events/interactions');
-        await handleLockUnlockMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_embed_menu_')) {
-        const { handleEmbedMenu } = require('./events/interactions');
-        await handleEmbedMenu(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_create_time_')) {
-        const { handleTimeSelect } = require('./events/interactions');
-        await handleTimeSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_create_size_')) {
-        const { handleSizeSelect } = require('./events/interactions');
-        await handleSizeSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_create_channel_')) {
-        const { handleChannelSelect } = require('./events/interactions');
-        await handleChannelSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_start_select_')) {
-        const { handleStartSelect } = require('./events/interactions');
-        await handleStartSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_action_')) {
-        const { handleRaidAction } = require('./events/interactions');
-        await handleRaidAction(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_edit_select_')) {
-        const { handleEditSelect } = require('./events/interactions');
-        await handleEditSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_edit_raid_select_')) {
-        const { handleEditRaidSelect } = require('./events/interactions');
-        await handleEditRaidSelect(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_delete_select_')) {
-        const { handleDeleteSelect } = require('./events/interactions');
-        await handleDeleteSelect(interaction);
-      }
-      else {
-        // Admin dropdowns and other select menus
+      
+      // Fallback to generic button handler (handles admin dropdowns)
+      if (!handled) {
         await handleButton(interaction);
       }
-    }
-    else if (interaction.isModalSubmit()) {
-      if (interaction.customId.startsWith('manual_ign_modal_')) {
-        const { handleManualIGNModal } = require('./events/interactions');
-        await handleManualIGNModal(interaction);
+      
+    } else if (interaction.isModalSubmit()) {
+      console.log(`[MODAL] ${interaction.user.tag} submitted ${interaction.customId}`);
+      
+      // Try to find matching handler
+      let handled = false;
+      for (const [prefix, handler] of Object.entries(INTERACTION_HANDLERS.modal)) {
+        if (interaction.customId.startsWith(prefix)) {
+          await handler(interaction);
+          handled = true;
+          break;
+        }
       }
-      // Raid modals
-      else if (interaction.customId.startsWith('raid_setup_modal_')) {
-        const { handleSetupModal } = require('./events/interactions');
-        await handleSetupModal(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_create_name_')) {
-        const { handleNameModal } = require('./events/interactions');
-        await handleNameModal(interaction);
-      }
-      else if (interaction.customId.startsWith('raid_create_date_')) {
-        const { handleDateModal } = require('./events/interactions');
-        await handleDateModal(interaction);
-      }
-      else {
-        await handleManualModal(interaction);
+      
+      if (!handled) {
+        console.warn(`No handler found for modal: ${interaction.customId}`);
       }
     }
-  } catch (error) {
-    console.error('Interaction error:', error);
     
-    const reply = {
-      content: '❌ An error occurred while processing your request.',
+  } catch (error) {
+    console.error(`[ERROR] Interaction ${interactionId}:`, error);
+    
+    // Better error response
+    const errorResponse = {
+      content: '❌ An error occurred while processing your request. Please try again.',
       ephemeral: true
     };
+    
+    // Add more specific error messages for common issues
+    if (error.code === 10062) {
+      errorResponse.content = '❌ This interaction has expired. Please try again.';
+    } else if (error.code === 50013) {
+      errorResponse.content = '❌ I don\'t have permission to perform this action.';
+    } else if (error.message?.includes('Unknown interaction')) {
+      errorResponse.content = '❌ This interaction is no longer valid. Please start over.';
+    }
 
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
-    } else {
-      await interaction.reply(reply);
+    try {
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp(errorResponse);
+      } else {
+        await interaction.reply(errorResponse);
+      }
+    } catch (replyError) {
+      console.error(`[ERROR] Failed to send error response for ${interactionId}:`, replyError);
     }
   }
 });
 
 client.on('error', error => {
-  console.error('Client error:', error);
+  console.error('❌ Client error:', error);
 });
 
 client.on('warn', warning => {
-  console.warn('Client warning:', warning);
+  console.warn('⚠️ Client warning:', warning);
 });
 
-process.on('unhandledRejection', error => {
-  console.error('Unhandled promise rejection:', error);
+client.on('shardError', error => {
+  console.error('❌ Shard error:', error);
 });
 
+process.on('unhandledRejection', (error, promise) => {
+  console.error('❌ Unhandled promise rejection:', error);
+  console.error('Promise:', promise);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught exception:', error);
+  // Don't exit immediately - let ongoing operations complete
+  setTimeout(() => {
+    console.error('💥 Exiting due to uncaught exception');
+    process.exit(1);
+  }, 3000);
+});
+
+// ✅ NEW - Graceful shutdown
+process.on('SIGINT', async () => {
+  console.log('🔄 Received SIGINT, shutting down gracefully...');
+  
+  try {
+    const { closeConnections } = require('./database/connection');
+    await closeConnections();
+    
+    client.destroy();
+    console.log('✅ Bot shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+});
+
+process.on('SIGTERM', async () => {
+  console.log('🔄 Received SIGTERM, shutting down gracefully...');
+  
+  try {
+    const { closeConnections } = require('./database/connection');
+    await closeConnections();
+    
+    client.destroy();
+    console.log('✅ Bot shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+});
+
+console.log('🚀 Starting bot...');
 client.login(process.env.DISCORD_TOKEN);
