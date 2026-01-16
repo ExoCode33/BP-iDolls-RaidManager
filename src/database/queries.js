@@ -79,21 +79,39 @@ async function updateRaidStatus(raidId, status) {
   );
 }
 
+// ✅ FIXED - Now validates allowed fields to prevent SQL injection
 async function updateRaid(raidId, data) {
+  // Whitelist of allowed fields to prevent SQL injection
+  const ALLOWED_FIELDS = [
+    'name', 'raid_size', 'start_time', 'tank_slots', 'support_slots', 
+    'dps_slots', 'channel_id', 'main_role_id', 'raid_slot', 'status',
+    'message_id', 'reminded_30m', 'locked', 'preset_id'
+  ];
+
   const fields = [];
   const values = [];
   let paramCount = 1;
 
   Object.entries(data).forEach(([key, value]) => {
+    // Validate that the field is allowed
+    if (!ALLOWED_FIELDS.includes(key)) {
+      console.warn(`Attempted to update non-whitelisted field: ${key}`);
+      return;
+    }
+    
     fields.push(`${key} = $${paramCount}`);
     values.push(value);
     paramCount++;
   });
 
+  if (fields.length === 0) {
+    throw new Error('No valid fields to update');
+  }
+
   values.push(raidId);
 
   await eventDB.query(
-    `UPDATE raids SET ${fields.join(', ')} WHERE id = $${paramCount}`,
+    `UPDATE raids SET ${fields.join(', ')}, updated_at = NOW() WHERE id = $${paramCount}`,
     values
   );
 }
@@ -185,6 +203,106 @@ async function createRegistration(data) {
   return result.rows[0];
 }
 
+// ✅ NEW - Transaction-safe registration with automatic status determination
+async function createRegistrationWithTransaction(data) {
+  const client = await eventDB.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Lock the raid row to prevent concurrent modifications
+    await client.query(
+      'SELECT * FROM raids WHERE id = $1 FOR UPDATE',
+      [data.raid_id]
+    );
+    
+    // Check if user is already registered
+    const existingCheck = await client.query(
+      'SELECT * FROM raid_registrations WHERE raid_id = $1 AND user_id = $2',
+      [data.raid_id, data.user_id]
+    );
+    
+    if (existingCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return { success: false, error: 'ALREADY_REGISTERED' };
+    }
+    
+    // Get current counts with lock
+    const countsResult = await client.query(
+      `SELECT role, status, COUNT(*) as count
+       FROM raid_registrations
+       WHERE raid_id = $1
+       GROUP BY role, status`,
+      [data.raid_id]
+    );
+    
+    const counts = {
+      Tank: { registered: 0, waitlist: 0, assist: 0 },
+      Support: { registered: 0, waitlist: 0, assist: 0 },
+      DPS: { registered: 0, waitlist: 0, assist: 0 },
+      total_registered: 0,
+      total_waitlist: 0,
+      total_assist: 0
+    };
+    
+    countsResult.rows.forEach(row => {
+      counts[row.role][row.status] = parseInt(row.count);
+      if (row.status === 'registered') {
+        counts.total_registered += parseInt(row.count);
+      } else if (row.status === 'waitlist') {
+        counts.total_waitlist += parseInt(row.count);
+      } else if (row.status === 'assist') {
+        counts.total_assist += parseInt(row.count);
+      }
+    });
+    
+    // Determine status based on raid capacity
+    const raid = data.raid;
+    const role = data.role;
+    const registrationType = data.registration_type;
+    
+    let status;
+    if (registrationType === 'assist') {
+      status = 'assist';
+    } else {
+      const roleFull = counts[role].registered >= raid[`${role.toLowerCase()}_slots`];
+      const raidFull = counts.total_registered >= raid.raid_size;
+      
+      if (roleFull || raidFull) {
+        status = 'waitlist';
+      } else {
+        status = 'registered';
+      }
+    }
+    
+    // Insert registration
+    const result = await client.query(
+      `INSERT INTO raid_registrations 
+      (raid_id, user_id, character_id, character_source, ign, class, subclass, ability_score, role, registration_type, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING *`,
+      [data.raid_id, data.user_id, data.character_id, data.character_source || 'main_bot',
+       data.ign, data.class, data.subclass, data.ability_score, data.role, 
+       data.registration_type, status]
+    );
+    
+    await client.query('COMMIT');
+    
+    return { 
+      success: true, 
+      registration: result.rows[0],
+      status: status
+    };
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Transaction registration error:', error);
+    return { success: false, error: error.message };
+  } finally {
+    client.release();
+  }
+}
+
 async function getRegistration(raidId, userId) {
   const result = await eventDB.query(
     'SELECT * FROM raid_registrations WHERE raid_id = $1 AND user_id = $2',
@@ -247,25 +365,46 @@ async function getRaidCounts(raidId) {
   return counts;
 }
 
+// ✅ FIXED - Now uses FOR UPDATE to prevent race conditions
 async function findNextWaitlistPlayer(raidId, role, preferredType = 'register') {
-  let result = await eventDB.query(
-    `SELECT * FROM raid_registrations 
-     WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
-     ORDER BY registered_at ASC LIMIT 1`,
-    [raidId, role, preferredType]
-  );
+  const client = await eventDB.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Try to find player with preferred type first (with lock)
+    let result = await client.query(
+      `SELECT * FROM raid_registrations 
+       WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
+       ORDER BY registered_at ASC 
+       LIMIT 1
+       FOR UPDATE SKIP LOCKED`,
+      [raidId, role, preferredType]
+    );
 
-  if (result.rows.length > 0) return result.rows[0];
-
-  const otherType = preferredType === 'register' ? 'assist' : 'register';
-  result = await eventDB.query(
-    `SELECT * FROM raid_registrations 
-     WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
-     ORDER BY registered_at ASC LIMIT 1`,
-    [raidId, role, otherType]
-  );
-
-  return result.rows[0] || null;
+    if (result.rows.length === 0) {
+      // Try other type
+      const otherType = preferredType === 'register' ? 'assist' : 'register';
+      result = await client.query(
+        `SELECT * FROM raid_registrations 
+         WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
+         ORDER BY registered_at ASC 
+         LIMIT 1
+         FOR UPDATE SKIP LOCKED`,
+        [raidId, role, otherType]
+      );
+    }
+    
+    await client.query('COMMIT');
+    return result.rows[0] || null;
+    
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Find next waitlist player error:', error);
+    return null;
+  } finally {
+    client.release();
+  }
 }
 
 async function getUserRaids(userId) {
@@ -338,6 +477,7 @@ module.exports = {
   
   // Registrations
   createRegistration,
+  createRegistrationWithTransaction, // ✅ NEW
   getRegistration,
   deleteRegistration,
   updateRegistrationStatus,
