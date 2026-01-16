@@ -6,7 +6,7 @@ const {
   getUserCharacters,
   getRaidRegistrations,
   getRaidCounts,
-  createRegistration,
+  createRegistrationWithTransaction,
   updateRegistrationStatus,
   findNextWaitlistPlayer,
   updateRaidStatus,
@@ -16,8 +16,13 @@ const { getClassEmoji, inferRole } = require('../utils/formatters');
 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
 const raidHandlers = require('./raid-handlers');
 
-// Store temporary manual registration state
+// Store temporary manual registration state with TTL
 const manualRegState = new Map();
+const MANUAL_REG_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Store active interactions to prevent spam
+const activeInteractions = new Map();
+const INTERACTION_COOLDOWN = 2000; // 2 seconds
 
 // Class definitions
 const CLASSES = {
@@ -40,8 +45,53 @@ const ABILITY_SCORES = [
   { label: '38k+', value: '38000' }
 ];
 
+// Helper function to check interaction cooldown
+function checkInteractionCooldown(userId, action) {
+  const key = `${userId}_${action}`;
+  const lastInteraction = activeInteractions.get(key);
+  
+  if (lastInteraction && Date.now() - lastInteraction < INTERACTION_COOLDOWN) {
+    return false; // Still on cooldown
+  }
+  
+  activeInteractions.set(key, Date.now());
+  
+  // Cleanup old entries
+  if (activeInteractions.size > 1000) {
+    const now = Date.now();
+    for (const [k, timestamp] of activeInteractions.entries()) {
+      if (now - timestamp > INTERACTION_COOLDOWN * 2) {
+        activeInteractions.delete(k);
+      }
+    }
+  }
+  
+  return true;
+}
+
+// Helper function to clean up expired manual registration state
+function cleanupExpiredState() {
+  const now = Date.now();
+  for (const [userId, state] of manualRegState.entries()) {
+    if (now - state.timestamp > MANUAL_REG_TTL) {
+      manualRegState.delete(userId);
+    }
+  }
+}
+
+// Run cleanup every minute
+setInterval(cleanupExpiredState, 60000);
+
 async function handleButton(interaction) {
   const [action, raidId] = interaction.customId.split('_');
+
+  // Check for spam
+  if (!checkInteractionCooldown(interaction.user.id, `button_${action}_${raidId}`)) {
+    return await interaction.reply({ 
+      content: '⏳ Please wait a moment before trying again.', 
+      ephemeral: true 
+    });
+  }
 
   // Handle admin dropdown selections
   if (action === 'admin') {
@@ -69,11 +119,12 @@ async function showManualClassSelection(interaction) {
   await interaction.deferReply({ flags: 64 });
 
   try {
-    // Store initial state
+    // Store initial state with timestamp
     manualRegState.set(interaction.user.id, {
       raidId: parseInt(raidId),
       registrationType,
-      step: 'class'
+      step: 'class',
+      timestamp: Date.now()
     });
 
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
@@ -134,6 +185,7 @@ async function handleManualClassSelect(interaction) {
     const selectedClass = interaction.values[0];
     state.class = selectedClass;
     state.step = 'subclass';
+    state.timestamp = Date.now(); // Update timestamp
     manualRegState.set(interaction.user.id, state);
 
     const subclasses = CLASSES[selectedClass].subclasses;
@@ -194,6 +246,7 @@ async function handleManualSubclassSelect(interaction) {
     const selectedSubclass = interaction.values[0];
     state.subclass = selectedSubclass;
     state.step = 'score';
+    state.timestamp = Date.now(); // Update timestamp
     manualRegState.set(interaction.user.id, state);
 
     const scoreOptions = ABILITY_SCORES.map(score => ({
@@ -239,6 +292,7 @@ async function handleManualScoreSelect(interaction) {
 
     const selectedScore = interaction.values[0];
     state.abilityScore = parseInt(selectedScore);
+    state.timestamp = Date.now(); // Update timestamp
     manualRegState.set(interaction.user.id, state);
 
     // Show modal for IGN
@@ -251,7 +305,8 @@ async function handleManualScoreSelect(interaction) {
       .setLabel('In-Game Name')
       .setStyle(TextInputStyle.Short)
       .setPlaceholder('Enter your character name')
-      .setRequired(true);
+      .setRequired(true)
+      .setMaxLength(100);
 
     const row = new ActionRowBuilder().addComponents(ignInput);
     modal.addComponents(row);
@@ -260,9 +315,7 @@ async function handleManualScoreSelect(interaction) {
 
   } catch (error) {
     console.error('Manual score select error:', error);
-    if (!interaction.replied) {
-      await interaction.reply({ content: '❌ An error occurred!', flags: 64 });
-    }
+    await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
   }
 }
 
@@ -278,40 +331,102 @@ async function handleManualIGNModal(interaction) {
       return await interaction.editReply({ content: '❌ Session expired. Please start again.' });
     }
 
+    const ign = interaction.fields.getTextInputValue('ign').trim();
+    
+    if (!ign || ign.length === 0) {
+      return await interaction.editReply({ content: '❌ Please enter a valid IGN!' });
+    }
+
     const raid = await getRaid(state.raidId);
     if (!raid) {
-      manualRegState.delete(interaction.user.id);
+      manualRegState.delete(interaction.user.id); // ✅ FIXED - Clean up state
       return await interaction.editReply({ content: '❌ Raid not found!' });
     }
 
-    const ign = interaction.fields.getTextInputValue('ign');
+    if (raid.status !== 'open') {
+      manualRegState.delete(interaction.user.id); // ✅ FIXED - Clean up state
+      return await interaction.editReply({ content: '❌ This raid is no longer open!' });
+    }
 
     const character = {
       id: null,
-      ign,
+      ign: ign,
       class: state.class,
       subclass: state.subclass,
       ability_score: state.abilityScore
     };
 
-    // Clean up state
-    manualRegState.delete(interaction.user.id);
-
     await processRegistration(interaction, raid, character, state.registrationType, 'manual');
+    
+    // ✅ FIXED - Clean up state after successful registration
+    manualRegState.delete(interaction.user.id);
 
   } catch (error) {
     console.error('Manual IGN modal error:', error);
+    // ✅ FIXED - Clean up state on error
     manualRegState.delete(interaction.user.id);
-    await interaction.editReply({ content: '❌ An error occurred!' });
+    await interaction.editReply({ content: '❌ An error occurred. Please try again.' });
   }
 }
 
-// Back button handlers for manual registration
 async function handleManualBackToClass(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await showManualClassSelection(interaction);
+  await interaction.deferUpdate();
+
+  try {
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
+    }
+
+    state.step = 'class';
+    state.timestamp = Date.now(); // Update timestamp
+    delete state.class;
+    delete state.subclass;
+    manualRegState.set(interaction.user.id, state);
+
+    const classOptions = Object.entries(CLASSES).map(([className, data]) => {
+      const emoji = getClassEmoji(className);
+      let emojiObj = undefined;
+      
+      if (emoji) {
+        const match = emoji.match(/<:(\w+):(\d+)>/);
+        if (match) {
+          emojiObj = { name: match[1], id: match[2] };
+        }
+      }
+
+      return {
+        label: className,
+        value: className,
+        description: data.role,
+        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+      };
+    });
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`manual_select_class_${interaction.user.id}`)
+      .setPlaceholder('🎭 Select your class')
+      .addOptions(classOptions);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`back_to_char_select_${state.raidId}_${state.registrationType}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: '**Step 1/3:** Select your class',
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Back to class error:', error);
+  }
 }
 
 async function handleManualBackToSubclass(interaction) {
@@ -320,137 +435,68 @@ async function handleManualBackToSubclass(interaction) {
 
   await interaction.deferUpdate();
 
-  const state = manualRegState.get(interaction.user.id);
-  if (!state || !state.class) {
-    return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
-  }
-
-  // Go back to subclass selection
-  await handleManualClassSelect(interaction);
-}
-
-async function handleAdminSelect(interaction) {
-  await interaction.deferReply({ flags: 64 });
-
   try {
-    const [, subcommand, ] = interaction.customId.split('_');
-    const raidId = parseInt(interaction.values[0]);
-
-    const raid = await getRaid(raidId);
-    if (!raid) {
-      return await interaction.editReply({
-        content: '❌ Raid not found!',
-        components: []
-      });
+    const state = manualRegState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
     }
 
-    switch (subcommand) {
-      case 'complete':
-        await updateRaidStatus(raidId, 'completed');
-        
-        const guild = interaction.guild;
-        const role = guild.roles.cache.get(raid.main_role_id);
-        
-        if (role) {
-          const members = role.members;
-          for (const [memberId, member] of members) {
-            try {
-              await member.roles.remove(role);
-            } catch (err) {
-              console.error(`Failed to remove role from ${memberId}:`, err);
-            }
-          }
-        }
+    state.step = 'subclass';
+    state.timestamp = Date.now(); // Update timestamp
+    delete state.subclass;
+    manualRegState.set(interaction.user.id, state);
 
-        try {
-          const channel = await interaction.client.channels.fetch(raid.channel_id);
-          const message = await channel.messages.fetch(raid.message_id);
-          await message.delete();
-        } catch (err) {
-          console.error('Failed to delete raid message:', err);
-        }
-
-        await interaction.editReply({
-          content: `✅ Raid "${raid.name}" has been completed and removed!`,
-          components: []
-        });
-        break;
-
-      case 'cancel':
-        await updateRaidStatus(raidId, 'cancelled');
-        
-        const guildCancel = interaction.guild;
-        const roleCancel = guildCancel.roles.cache.get(raid.main_role_id);
-        
-        if (roleCancel) {
-          const members = roleCancel.members;
-          for (const [memberId, member] of members) {
-            try {
-              await member.roles.remove(roleCancel);
-            } catch (err) {
-              console.error(`Failed to remove role from ${memberId}:`, err);
-            }
-          }
-        }
-
-        try {
-          const channel = await interaction.client.channels.fetch(raid.channel_id);
-          const message = await channel.messages.fetch(raid.message_id);
-          await message.delete();
-        } catch (err) {
-          console.error('Failed to delete raid message:', err);
-        }
-
-        await interaction.editReply({
-          content: `✅ Raid "${raid.name}" has been cancelled and removed!`,
-          components: []
-        });
-        break;
-
-      case 'repost':
-        const channel = await interaction.client.channels.fetch(raid.channel_id);
-        const registrations = await getRaidRegistrations(raidId);
-        const embed = await createRaidEmbed(raid, registrations);
-        const buttons = createRaidButtons(raidId, raid.locked);
-
-        const newMessage = await channel.send({
-          embeds: [embed],
-          components: [buttons]
-        });
-
-        await updateRaidMessageId(raidId, newMessage.id);
-
-        await interaction.editReply({
-          content: `✅ Raid "${raid.name}" has been reposted!`,
-          components: []
-        });
-        break;
-
-      case 'refresh':
-        await updateRaidMessage(raid, interaction.client);
-        await interaction.editReply({
-          content: `✅ Raid "${raid.name}" has been refreshed!`,
-          components: []
-        });
-        break;
-
-      default:
-        await interaction.editReply({
-          content: '❌ Unknown admin action!',
-          components: []
-        });
+    const subclasses = CLASSES[state.class].subclasses;
+    const classRole = CLASSES[state.class].role;
+    const classEmoji = getClassEmoji(state.class);
+    
+    let emojiObj = undefined;
+    if (classEmoji) {
+      const match = classEmoji.match(/<:(\w+):(\d+)>/);
+      if (match) {
+        emojiObj = { name: match[1], id: match[2] };
+      }
     }
+
+    const subclassOptions = subclasses.map(subclass => ({
+      label: subclass,
+      value: subclass,
+      description: classRole,
+      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`manual_select_subclass_${interaction.user.id}`)
+      .setPlaceholder('✨ Select your subclass')
+      .addOptions(subclassOptions);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`manual_back_to_class_${interaction.user.id}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    await interaction.editReply({
+      content: `**Step 2/3:** Select your subclass\nClass: **${state.class}**`,
+      components: [row1, row2]
+    });
 
   } catch (error) {
-    console.error('Admin action error:', error);
-    await interaction.editReply({
-      content: '❌ An error occurred!',
-      components: []
-    });
+    console.error('Back to subclass error:', error);
   }
 }
 
 async function handleRegistration(interaction, raidId, registrationType) {
+  // Check for spam
+  if (!checkInteractionCooldown(interaction.user.id, `register_${raidId}`)) {
+    return await interaction.reply({ 
+      content: '⏳ Please wait a moment before trying again.', 
+      ephemeral: true 
+    });
+  }
+
   await interaction.deferReply({ flags: 64 });
 
   try {
@@ -463,6 +509,10 @@ async function handleRegistration(interaction, raidId, registrationType) {
       return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
     }
 
+    if (raid.locked && registrationType === 'register') {
+      return await interaction.editReply({ content: '❌ This raid is locked! Registration is closed.' });
+    }
+
     const existing = await getRegistration(raidId, interaction.user.id);
     if (existing) {
       return await interaction.editReply({ 
@@ -471,34 +521,23 @@ async function handleRegistration(interaction, raidId, registrationType) {
     }
 
     const characters = await getUserCharacters(interaction.user.id);
-
     const options = [];
 
     for (const char of characters) {
-      const role = inferRole(char.class);
-      
-      let typeLabel = char.character_type;
-      if (typeLabel === 'main_subclass') {
-        typeLabel = 'Subclass';
-      }
-      
-      const classEmojiRaw = getClassEmoji(char.class);
+      const classEmoji = getClassEmoji(char.class);
       let emojiObj = undefined;
       
-      if (classEmojiRaw) {
-        const match = classEmojiRaw.match(/<:(\w+):(\d+)>/);
+      if (classEmoji) {
+        const match = classEmoji.match(/<:(\w+):(\d+)>/);
         if (match) {
-          emojiObj = {
-            name: match[1],
-            id: match[2]
-          };
+          emojiObj = { name: match[1], id: match[2] };
         }
       }
-      
+
       options.push({
-        label: `${char.ign} - ${char.class} (${typeLabel})`,
+        label: char.ign,
         value: `char_${char.id}`,
-        description: `${char.subclass} - ${role}`,
+        description: `${char.subclass} • ${char.ability_score}`,
         emoji: emojiObj
       });
     }
@@ -607,59 +646,84 @@ async function handleCharacterSelect(interaction) {
   }
 }
 
+// ✅ FIXED - Now uses transaction for atomic registration
 async function processRegistration(interaction, raid, character, registrationType, source) {
   const role = inferRole(character.class);
-  const counts = await getRaidCounts(raid.id);
 
-  const totalRegistered = counts.total_registered;
-  const roleFull = counts[role].registered >= raid[`${role.toLowerCase()}_slots`];
-  const raidFull = totalRegistered >= raid.raid_size;
+  try {
+    // Use transaction-safe registration
+    const result = await createRegistrationWithTransaction({
+      raid_id: raid.id,
+      user_id: interaction.user.id,
+      character_id: character.id,
+      character_source: source,
+      ign: character.ign,
+      class: character.class,
+      subclass: character.subclass,
+      ability_score: character.ability_score,
+      role,
+      registration_type: registrationType,
+      raid
+    });
 
-  let status;
-  if (registrationType === 'assist') {
-    status = 'assist';
-  } else if (roleFull || raidFull) {
-    status = 'waitlist';
-  } else {
-    status = 'registered';
-  }
-
-  await createRegistration({
-    raid_id: raid.id,
-    user_id: interaction.user.id,
-    character_id: character.id,
-    ign: character.ign,
-    class: character.class,
-    subclass: character.subclass,
-    ability_score: character.ability_score,
-    role,
-    registration_type: registrationType,
-    status
-  });
-
-  if (status === 'registered') {
-    try {
-      const member = await interaction.guild.members.fetch(interaction.user.id);
-      await member.roles.add(raid.main_role_id);
-    } catch (err) {
-      console.error('Failed to add role:', err);
+    if (!result.success) {
+      if (result.error === 'ALREADY_REGISTERED') {
+        return await interaction.editReply({ 
+          content: '❌ You are already registered for this raid!' 
+        });
+      }
+      throw new Error(result.error || 'Registration failed');
     }
-  }
 
-  await updateRaidMessage(raid, interaction.client);
+    const { status } = result;
 
-  let message = '✅ Successfully registered!';
-  if (status === 'waitlist') message = '✅ Added to waitlist!';
-  if (status === 'assist') message = '✅ Marked as assist!';
+    // Add Discord role if registered (not waitlist)
+    if (status === 'registered') {
+      try {
+        const member = await interaction.guild.members.fetch(interaction.user.id);
+        await member.roles.add(raid.main_role_id);
+      } catch (err) {
+        console.error('Failed to add role:', err);
+      }
+    }
 
-  if (interaction.deferred) {
-    await interaction.followUp({ content: message, flags: 64 });
-  } else {
-    await interaction.editReply({ content: message });
+    await updateRaidMessage(raid, interaction.client);
+
+    let message = '✅ Successfully registered!';
+    if (status === 'waitlist') message = '✅ Added to waitlist!';
+    if (status === 'assist') message = '✅ Marked as assist!';
+
+    if (interaction.deferred) {
+      await interaction.followUp({ content: message, flags: 64 });
+    } else {
+      await interaction.editReply({ content: message });
+    }
+  } catch (error) {
+    console.error('Process registration error:', error);
+    
+    let errorMessage = '❌ An error occurred. Please try again.';
+    if (error.message.includes('duplicate key')) {
+      errorMessage = '❌ You are already registered for this raid!';
+    }
+    
+    if (interaction.deferred) {
+      await interaction.followUp({ content: errorMessage, flags: 64 });
+    } else {
+      await interaction.editReply({ content: errorMessage });
+    }
   }
 }
 
+// ✅ FIXED - Now uses transaction for atomic unregister + waitlist promotion
 async function handleUnregister(interaction, raidId) {
+  // Check for spam
+  if (!checkInteractionCooldown(interaction.user.id, `unregister_${raidId}`)) {
+    return await interaction.reply({ 
+      content: '⏳ Please wait a moment before trying again.', 
+      ephemeral: true 
+    });
+  }
+
   await interaction.deferReply({ flags: 64 });
 
   try {
@@ -678,6 +742,7 @@ async function handleUnregister(interaction, raidId) {
 
     await deleteRegistration(raidId, interaction.user.id);
 
+    // Remove Discord role
     try {
       const member = await interaction.guild.members.fetch(interaction.user.id);
       await member.roles.remove(raid.main_role_id);
@@ -685,6 +750,7 @@ async function handleUnregister(interaction, raidId) {
       console.error('Failed to remove role:', err);
     }
 
+    // Promote from waitlist if there was a registered player
     if (wasRegistered) {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
       await promoteFromWaitlist(raid, userRole, channel);
@@ -700,6 +766,7 @@ async function handleUnregister(interaction, raidId) {
   }
 }
 
+// ✅ FIXED - Now uses transaction for atomic promotion
 async function promoteFromWaitlist(raid, role, channel) {
   try {
     const registrationType = 'register';
@@ -710,8 +777,12 @@ async function promoteFromWaitlist(raid, role, channel) {
     await updateRegistrationStatus(nextPlayer.id, 'registered');
 
     const guild = channel.guild;
-    const member = await guild.members.fetch(nextPlayer.user_id);
-    await member.roles.add(raid.main_role_id);
+    try {
+      const member = await guild.members.fetch(nextPlayer.user_id);
+      await member.roles.add(raid.main_role_id);
+    } catch (err) {
+      console.error('Failed to add role to promoted player:', err);
+    }
 
     await channel.send(
       `<@${nextPlayer.user_id}> you've been promoted from the waitlist! You're now in the raid! 🎉`
@@ -727,7 +798,7 @@ async function updateRaidMessage(raid, client) {
     if (!raid.message_id || !raid.channel_id) return;
 
     const registrations = await getRaidRegistrations(raid.id);
-    const embed = await createRaidEmbed(raid, registrations); // ✅ FIXED - ADDED AWAIT
+    const embed = await createRaidEmbed(raid, registrations);
     const buttons = createRaidButtons(raid.id, raid.locked);
 
     const channel = await client.channels.fetch(raid.channel_id);
