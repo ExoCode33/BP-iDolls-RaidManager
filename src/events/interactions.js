@@ -12,7 +12,7 @@ const {
   updateRaidStatus,
   updateRaidMessageId
 } = require('../database/queries');
-const { getClassEmoji, inferRole } = require('../utils/formatters');
+const { getClassEmoji, inferRole, getPowerRange } = require('../utils/formatters');
 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
 const raidHandlers = require('./raid-handlers');
 
@@ -44,6 +44,29 @@ const ABILITY_SCORES = [
   { label: '36-38k', value: '36000' },
   { label: '38k+', value: '38000' }
 ];
+
+// Helper function to safely parse custom emoji
+function parseCustomEmoji(emojiString) {
+  if (!emojiString || typeof emojiString !== 'string') {
+    return null;
+  }
+  
+  const match = emojiString.match(/<:(\w+):(\d+)>/);
+  if (match) {
+    return { name: match[1], id: match[2] };
+  }
+  
+  return null;
+}
+
+// Helper function to get emoji for dropdown options
+function getEmojiForOption(customEmojiString, fallbackUnicode) {
+  const customEmoji = parseCustomEmoji(customEmojiString);
+  if (customEmoji) {
+    return customEmoji;
+  }
+  return fallbackUnicode;
+}
 
 // Helper function to check interaction cooldown
 function checkInteractionCooldown(userId, action) {
@@ -128,21 +151,18 @@ async function showManualClassSelection(interaction) {
     });
 
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
-      let emojiObj = undefined;
+      const classEmoji = getClassEmoji(className);
+      const roleEmojiMap = {
+        'Tank': '🛡️',
+        'Support': '💚',
+        'DPS': '⚔️'
+      };
       
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
-
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+        emoji: getEmojiForOption(classEmoji, roleEmojiMap[data.role])
       };
     });
 
@@ -192,19 +212,17 @@ async function handleManualClassSelect(interaction) {
     const classRole = CLASSES[selectedClass].role;
     const classEmoji = getClassEmoji(selectedClass);
     
-    let emojiObj = undefined;
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
+    const roleEmojiMap = {
+      'Tank': '🛡️',
+      'Support': '💚',
+      'DPS': '⚔️'
+    };
 
     const subclassOptions = subclasses.map(subclass => ({
       label: subclass,
       value: subclass,
       description: classRole,
-      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+      emoji: getEmojiForOption(classEmoji, roleEmojiMap[classRole])
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -252,13 +270,12 @@ async function handleManualSubclassSelect(interaction) {
     const scoreOptions = ABILITY_SCORES.map(score => ({
       label: score.label,
       value: score.value,
-      description: 'Combat Power',
-      emoji: '💪'
+      emoji: '⚡'
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`manual_select_score_${interaction.user.id}`)
-      .setPlaceholder('⚔️ Select your ability score')
+      .setPlaceholder('⚡ Select your ability score range')
       .addOptions(scoreOptions);
 
     const backButton = new ButtonBuilder()
@@ -270,7 +287,7 @@ async function handleManualSubclassSelect(interaction) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
-      content: `**Step 3/3:** Select your ability score\nClass: **${state.class}** | Subclass: **${selectedSubclass}**`,
+      content: `**Step 3/3:** Select your ability score\nClass: **${state.class}**\nSubclass: **${selectedSubclass}**`,
       components: [row1, row2]
     });
 
@@ -290,23 +307,23 @@ async function handleManualScoreSelect(interaction) {
       return await interaction.reply({ content: '❌ Session expired. Please start again.', flags: 64 });
     }
 
-    const selectedScore = interaction.values[0];
-    state.abilityScore = parseInt(selectedScore);
+    const selectedScore = parseInt(interaction.values[0]);
+    state.ability_score = selectedScore;
+    state.step = 'ign';
     state.timestamp = Date.now(); // Update timestamp
     manualRegState.set(interaction.user.id, state);
 
-    // Show modal for IGN
     const modal = new ModalBuilder()
       .setCustomId(`manual_ign_modal_${interaction.user.id}`)
-      .setTitle('Final Step: Enter IGN');
+      .setTitle('Enter Your IGN');
 
     const ignInput = new TextInputBuilder()
-      .setCustomId('ign')
-      .setLabel('In-Game Name')
-      .setStyle(TextInputStyle.Short)
+      .setCustomId('ign_input')
+      .setLabel('In-Game Name (IGN)')
       .setPlaceholder('Enter your character name')
+      .setStyle(TextInputStyle.Short)
       .setRequired(true)
-      .setMaxLength(100);
+      .setMaxLength(50);
 
     const row = new ActionRowBuilder().addComponents(ignInput);
     modal.addComponents(row);
@@ -315,7 +332,11 @@ async function handleManualScoreSelect(interaction) {
 
   } catch (error) {
     console.error('Manual score select error:', error);
-    await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({ content: '❌ An error occurred!', flags: 64 });
+    } else {
+      await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
+    }
   }
 }
 
@@ -331,40 +352,35 @@ async function handleManualIGNModal(interaction) {
       return await interaction.editReply({ content: '❌ Session expired. Please start again.' });
     }
 
-    const ign = interaction.fields.getTextInputValue('ign').trim();
+    const ign = interaction.fields.getTextInputValue('ign_input').trim();
     
-    if (!ign || ign.length === 0) {
-      return await interaction.editReply({ content: '❌ Please enter a valid IGN!' });
+    if (!ign) {
+      return await interaction.editReply({ content: '❌ IGN cannot be empty!' });
     }
 
     const raid = await getRaid(state.raidId);
     if (!raid) {
-      manualRegState.delete(interaction.user.id); // ✅ FIXED - Clean up state
       return await interaction.editReply({ content: '❌ Raid not found!' });
     }
 
     if (raid.status !== 'open') {
-      manualRegState.delete(interaction.user.id); // ✅ FIXED - Clean up state
-      return await interaction.editReply({ content: '❌ This raid is no longer open!' });
+      return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
     }
 
     const character = {
-      id: null,
-      ign: ign,
+      ign,
       class: state.class,
       subclass: state.subclass,
-      ability_score: state.abilityScore
+      ability_score: state.ability_score
     };
 
     await processRegistration(interaction, raid, character, state.registrationType, 'manual');
     
-    // ✅ FIXED - Clean up state after successful registration
+    // Clean up state
     manualRegState.delete(interaction.user.id);
 
   } catch (error) {
     console.error('Manual IGN modal error:', error);
-    // ✅ FIXED - Clean up state on error
-    manualRegState.delete(interaction.user.id);
     await interaction.editReply({ content: '❌ An error occurred. Please try again.' });
   }
 }
@@ -383,26 +399,23 @@ async function handleManualBackToClass(interaction) {
 
     state.step = 'class';
     state.timestamp = Date.now(); // Update timestamp
-    delete state.class;
     delete state.subclass;
+    delete state.ability_score;
     manualRegState.set(interaction.user.id, state);
 
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
-      let emojiObj = undefined;
+      const classEmoji = getClassEmoji(className);
+      const roleEmojiMap = {
+        'Tank': '🛡️',
+        'Support': '💚',
+        'DPS': '⚔️'
+      };
       
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
-
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+        emoji: getEmojiForOption(classEmoji, roleEmojiMap[data.role])
       };
     });
 
@@ -443,26 +456,24 @@ async function handleManualBackToSubclass(interaction) {
 
     state.step = 'subclass';
     state.timestamp = Date.now(); // Update timestamp
-    delete state.subclass;
+    delete state.ability_score;
     manualRegState.set(interaction.user.id, state);
 
     const subclasses = CLASSES[state.class].subclasses;
     const classRole = CLASSES[state.class].role;
     const classEmoji = getClassEmoji(state.class);
     
-    let emojiObj = undefined;
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
+    const roleEmojiMap = {
+      'Tank': '🛡️',
+      'Support': '💚',
+      'DPS': '⚔️'
+    };
 
     const subclassOptions = subclasses.map(subclass => ({
       label: subclass,
       value: subclass,
       description: classRole,
-      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+      emoji: getEmojiForOption(classEmoji, roleEmojiMap[classRole])
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -525,34 +536,19 @@ async function handleRegistration(interaction, raidId, registrationType) {
 
     for (const char of characters) {
       const classEmoji = getClassEmoji(char.class);
-      let emojiObj = undefined;
+      const powerRange = getPowerRange(char.ability_score);
       
-      if (classEmoji) {
-        const match = classEmoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
-
       options.push({
         label: char.ign,
         value: `char_${char.id}`,
-        description: `${char.subclass} • ${char.ability_score}`,
-        emoji: emojiObj
+        description: `${char.subclass} • ${powerRange}`,
+        emoji: getEmojiForOption(classEmoji, '⚔️')
       });
     }
 
-    if (options.length > 0) {
-      options.push({
-        label: '────────────────────────',
-        value: 'separator',
-        description: 'My character is not listed',
-        disabled: true
-      });
-    }
-
+    // Only add manual entry option (no confusing separator)
     options.push({
-      label: 'My Character is not listed',
+      label: 'Manual Entry (Character not listed)',
       value: `manual_entry_${registrationType}`,
       emoji: '📝'
     });
