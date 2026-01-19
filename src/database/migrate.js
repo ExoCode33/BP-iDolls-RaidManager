@@ -30,8 +30,11 @@ CREATE TABLE IF NOT EXISTS raids (
   -- Metadata
   created_by VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
   reminded_30m BOOLEAN DEFAULT false,
+  locked BOOLEAN DEFAULT false,
+  preset_id INTEGER,
   
   -- Ensure only 2 active raids max (enforced in application logic)
   CONSTRAINT unique_active_slot UNIQUE (raid_slot, status)
@@ -75,6 +78,39 @@ INSERT INTO bot_config (key, value) VALUES
   ('raid1_role_id', 'not_set'),
   ('raid2_role_id', 'not_set')
 ON CONFLICT (key) DO NOTHING;
+
+-- Add locked column if it doesn't exist (for existing databases)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'raids' AND column_name = 'locked'
+  ) THEN
+    ALTER TABLE raids ADD COLUMN locked BOOLEAN DEFAULT false;
+  END IF;
+END $$;
+
+-- Add updated_at column if it doesn't exist (for existing databases)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'raids' AND column_name = 'updated_at'
+  ) THEN
+    ALTER TABLE raids ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
+  END IF;
+END $$;
+
+-- Add preset_id column if it doesn't exist (for existing databases)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'raids' AND column_name = 'preset_id'
+  ) THEN
+    ALTER TABLE raids ADD COLUMN preset_id INTEGER;
+  END IF;
+END $$;
 `;
 
 async function migrate() {
