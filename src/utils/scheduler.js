@@ -149,7 +149,7 @@ function startReminderScheduler(client) {
       }
 
       // ========== AUTO CLEANUP ==========
-      // Clean up raids that are past their start time
+      // ✅ CHANGED: Keep embed, remove buttons and roles only
       const activeRaids = await getActiveRaids();
       const raidsToCleanup = activeRaids.filter(raid => {
         const raidStartTime = new Date(raid.start_time);
@@ -195,15 +195,28 @@ function startReminderScheduler(client) {
             console.error(`Failed to remove roles for raid ${raid.id}:`, err);
           }
           
-          // Delete the raid message
+          // ✅ NEW: Update the embed to remove buttons (keep embed visible)
           if (raid.message_id && raid.channel_id) {
             try {
+              const { getRaidRegistrations } = require('../database/queries');
+              const { createRaidEmbed } = require('../utils/embeds');
+              
               const channel = await client.channels.fetch(raid.channel_id);
               const message = await channel.messages.fetch(raid.message_id);
-              await message.delete();
-              console.log(`✅ Deleted message for raid ${raid.id}`);
+              
+              // Get registrations and create embed
+              const registrations = await getRaidRegistrations(raid.id);
+              const embed = await createRaidEmbed({ ...raid, status: 'completed' }, registrations);
+              
+              // Update message - keep embed but remove all buttons/components
+              await message.edit({ 
+                embeds: [embed], 
+                components: [] // ✅ Remove all buttons
+              });
+              
+              console.log(`✅ Removed buttons from raid ${raid.id} embed (kept embed visible)`);
             } catch (err) {
-              console.error(`Failed to delete message for raid ${raid.id}:`, err);
+              console.error(`Failed to update message for raid ${raid.id}:`, err);
             }
           }
           
@@ -328,8 +341,55 @@ function startReminderScheduler(client) {
 
       if (oldRaids.length > 0) {
         console.log(`🧹 Found ${oldRaids.length} old raid(s) to clean up`);
+        
         for (const raid of oldRaids) {
+          // Update status
           await updateRaidStatus(raid.id, 'completed');
+          
+          // Remove roles
+          try {
+            const guild = client.guilds.cache.first();
+            if (guild) {
+              const role = guild.roles.cache.get(raid.main_role_id);
+              if (role) {
+                const members = role.members;
+                for (const [memberId, member] of members) {
+                  try {
+                    await member.roles.remove(role);
+                  } catch (err) {
+                    console.error(`Failed to remove role from ${memberId}:`, err);
+                  }
+                }
+                console.log(`✅ Removed role from ${members.size} members for raid ${raid.id}`);
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to remove roles for raid ${raid.id}:`, err);
+          }
+          
+          // ✅ NEW: Update embed to remove buttons (keep embed)
+          if (raid.message_id && raid.channel_id) {
+            try {
+              const { getRaidRegistrations } = require('../database/queries');
+              const { createRaidEmbed } = require('../utils/embeds');
+              
+              const channel = await client.channels.fetch(raid.channel_id);
+              const message = await channel.messages.fetch(raid.message_id);
+              
+              const registrations = await getRaidRegistrations(raid.id);
+              const embed = await createRaidEmbed({ ...raid, status: 'completed' }, registrations);
+              
+              await message.edit({ 
+                embeds: [embed], 
+                components: [] // Remove all buttons
+              });
+              
+              console.log(`✅ Removed buttons from raid ${raid.id} (kept embed)`);
+            } catch (err) {
+              console.error(`Failed to update embed for raid ${raid.id}:`, err);
+            }
+          }
+          
           console.log(`✅ Marked raid ${raid.id} as completed`);
         }
       } else {
@@ -345,6 +405,7 @@ function startReminderScheduler(client) {
   console.log(`ℹ️  Reminders enabled: ${process.env.REMINDER_30MIN === 'true' ? 'YES' : 'NO'}`);
   console.log(`ℹ️  Auto-lock enabled: ${AUTO_LOCK_HOURS > 0 ? `YES (${AUTO_LOCK_HOURS} hours before start)` : 'NO'}`);
   console.log(`ℹ️  Auto-cleanup enabled: YES (2 hours after raid start)`);
+  console.log(`ℹ️  Embed behavior: Keep visible, remove buttons only`);
 }
 
 // ✅ Health check function
