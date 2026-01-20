@@ -6,7 +6,7 @@ const classEmojis = {
   'Shield Knight': '<:ShieldKnight:1460272593306255465>',
   'Stormblade': '<:StormBlade:1460272591473348618>',
   'Verdant Oracle': '<:VerdantOracle:1460272589296504916>',
-  'Wind Knight': '<:WindKnight:1460272588779913428>'
+  'Wind Knight': '<:WindKnight:1460272587799138428>'
 };
 
 const tankClasses = ['Heavy Guardian', 'Shield Knight'];
