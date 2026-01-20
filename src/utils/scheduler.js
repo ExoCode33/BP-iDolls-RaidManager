@@ -136,9 +136,12 @@ function startReminderScheduler(client) {
 
           const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
 
-          await channel.send(
-            `<@&${raid.main_role_id}> 🔔 Your raid "${raid.name}" starts in 30 minutes! <t:${timestamp}:R>`
+          const reminderMessage = await channel.send(
+            `<@&${raid.main_role_id}> It's almost showtime! "${raid.name}" starts <t:${timestamp}:R> ✨`
           );
+
+          // Store reminder message ID for later deletion
+          await updateRaid(raid.id, { reminder_message_id: reminderMessage.id });
 
           await markRaidReminded(raid.id);
           console.log(`✅ Sent reminder for raid ${raid.id}: "${raid.name}"`);
@@ -224,6 +227,18 @@ function startReminderScheduler(client) {
               console.log(`✅ Deleted lock notification for raid ${raid.id}`);
             } catch (err) {
               console.error(`Failed to delete lock notification for raid ${raid.id}:`, err);
+            }
+          }
+
+          // ✅ NEW: Delete reminder message if it exists
+          if (raid.reminder_message_id && raid.channel_id) {
+            try {
+              const channel = await client.channels.fetch(raid.channel_id);
+              const reminderMessage = await channel.messages.fetch(raid.reminder_message_id);
+              await reminderMessage.delete();
+              console.log(`✅ Deleted reminder message for raid ${raid.id}`);
+            } catch (err) {
+              console.error(`Failed to delete reminder message for raid ${raid.id}:`, err);
             }
           }
           
