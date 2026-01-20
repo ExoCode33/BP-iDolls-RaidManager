@@ -276,10 +276,19 @@ async function handleChannelSelect(interaction) {
     state.channelId = channelId;
 
     // Create the raid
-    const startTime = new Date(`${state.date}T${state.time}:00Z`);
+    let startTime = new Date(`${state.date}T${state.time}:00Z`);
     if (isNaN(startTime.getTime())) {
       raidCreationState.delete(interaction.user.id);
       return await redirectToMainMenu(interaction, '❌ Invalid date/time format! Redirecting to main menu...');
+    }
+
+    // ✅ FIX: If the time is in the past, add 1 day
+    // This handles cases where UTC time crosses midnight
+    // Example: 8 PM EST = 1 AM UTC next day
+    const now = new Date();
+    if (startTime < now) {
+      startTime.setDate(startTime.getDate() + 1);
+      console.log(`⚠️ Raid time was in the past, moved to next day: ${startTime.toISOString()}`);
     }
 
     const raidSlot = await getAvailableRaidSlot();
