@@ -190,7 +190,15 @@ function cleanupExpiredState() {
 setInterval(cleanupExpiredState, 60000);
 
 async function handleButton(interaction) {
-  const [action, raidId] = interaction.customId.split('_');
+  const [action, ...parts] = interaction.customId.split('_');
+
+  // ✅ Handle AS confirm button separately
+  if (interaction.customId.startsWith('as_confirm_current_')) {
+    return await handleASConfirmCurrent(interaction);
+  }
+
+  // Get raidId from second part for standard buttons
+  const raidId = parts[0];
 
   // ✅ FIX: Only handle register/assist/unregister buttons
   // Let other buttons (like raid_management_menu) be handled by their own handlers
@@ -904,14 +912,21 @@ async function showASSelection(interaction, raid, character, registrationType) {
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`as_update_select_${interaction.user.id}`)
-      .setPlaceholder('💪 Confirm or update your Ability Score')
+      .setPlaceholder('💪 Select your current Ability Score')
       .addOptions(scoreOptions);
 
-    const row = new ActionRowBuilder().addComponents(selectMenu);
+    // ✅ NEW: Add quick confirm button
+    const confirmButton = new ButtonBuilder()
+      .setCustomId(`as_confirm_current_${interaction.user.id}`)
+      .setLabel(`✓ ${currentRange?.label || currentAS} is still valid`)
+      .setStyle(ButtonStyle.Success);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(confirmButton);
 
     await interaction.editReply({
-      content: `**Confirm Ability Score**\n\nCharacter: **${character.ign}**\nClass: **${character.class}** | Subclass: **${character.subclass}**\n\nCurrent AS: **${currentRange?.label || currentAS}**\n\nSelect your current ability score range:`,
-      components: [row]
+      content: `❓ **Quick Check - Is your AS still ${currentRange?.label || currentAS}?**\n\n**Character:** ${character.ign} (${character.class} - ${character.subclass})\n\nSelect below to confirm or update:`,
+      components: [row1, row2]
     });
 
   } catch (error) {
@@ -976,6 +991,40 @@ async function handleASUpdateSelect(interaction) {
 
   } catch (error) {
     console.error('AS update select error:', error);
+    asSelectionState.delete(interaction.user.id);
+    await interaction.followUp({ content: '❌ An error occurred. Please try again.', flags: 64 });
+  }
+}
+
+// ✅ NEW - Handle quick confirm button (AS is still valid)
+async function handleASConfirmCurrent(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  try {
+    const state = asSelectionState.get(interaction.user.id);
+    if (!state) {
+      return await interaction.followUp({ content: '❌ Session expired. Please try again.', flags: 64 });
+    }
+
+    const { raidId, character, registrationType } = state;
+
+    // Clean up state
+    asSelectionState.delete(interaction.user.id);
+
+    // Get raid again to ensure fresh data
+    const raid = await getRaid(raidId);
+    if (!raid) {
+      return await interaction.followUp({ content: '❌ Raid not found!', flags: 64 });
+    }
+
+    // Process registration without AS update (current AS is valid)
+    await processRegistration(interaction, raid, character, registrationType, 'main_bot', false, '');
+
+  } catch (error) {
+    console.error('AS confirm current error:', error);
     asSelectionState.delete(interaction.user.id);
     await interaction.followUp({ content: '❌ An error occurred. Please try again.', flags: 64 });
   }
@@ -1162,5 +1211,6 @@ module.exports = {
   handleManualBackToClass,
   handleManualBackToSubclass,
   handleASUpdateSelect,
+  handleASConfirmCurrent,
   ...raidHandlers
 };
