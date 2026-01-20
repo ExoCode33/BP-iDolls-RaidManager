@@ -240,29 +240,27 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       timestamp: Date.now()
     });
 
-    // ✅ FIX: Use custom emojis from your server
+    // ✅ FIX: Use YOUR server's custom emoji IDs (hardcoded)
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
       let emojiObj = undefined;
       
-      // Try to parse custom emoji
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
-      
-      // Fallback to simple emoji if custom emoji fails
-      if (!emojiObj) {
-        if (className === 'Beat Performer') emojiObj = '🎵';
-        else if (className === 'Frost Mage') emojiObj = '❄️';
-        else if (className === 'Heavy Guardian') emojiObj = '🛡️';
-        else if (className === 'Marksman') emojiObj = '🏹';
-        else if (className === 'Shield Knight') emojiObj = '⚔️';
-        else if (className === 'Stormblade') emojiObj = '⚡';
-        else if (className === 'Verdant Oracle') emojiObj = '🌿';
-        else if (className === 'Wind Knight') emojiObj = '💨';
+      // Hardcoded custom emoji IDs from your server
+      if (className === 'Beat Performer') {
+        emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
+      } else if (className === 'Frost Mage') {
+        emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
+      } else if (className === 'Heavy Guardian') {
+        emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
+      } else if (className === 'Marksman') {
+        emojiObj = { name: 'Marksman', id: '1460272594275012671' };
+      } else if (className === 'Shield Knight') {
+        emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
+      } else if (className === 'Stormblade') {
+        emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
+      } else if (className === 'Verdant Oracle') {
+        emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
+      } else if (className === 'Wind Knight') {
+        emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
       }
 
       return {
@@ -326,27 +324,24 @@ async function handleManualClassSelect(interaction) {
     const subclasses = CLASSES[selectedClass].subclasses;
     const classRole = CLASSES[selectedClass].role;
     
-    // ✅ FIX: Use custom emojis from your server
-    const classEmoji = getClassEmoji(selectedClass);
+    // ✅ FIX: Hardcoded custom emoji IDs
     let emojiObj = undefined;
-    
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
-    
-    // Fallback to simple emoji if custom emoji fails
-    if (!emojiObj) {
-      if (selectedClass === 'Beat Performer') emojiObj = '🎵';
-      else if (selectedClass === 'Frost Mage') emojiObj = '❄️';
-      else if (selectedClass === 'Heavy Guardian') emojiObj = '🛡️';
-      else if (selectedClass === 'Marksman') emojiObj = '🏹';
-      else if (selectedClass === 'Shield Knight') emojiObj = '⚔️';
-      else if (selectedClass === 'Stormblade') emojiObj = '⚡';
-      else if (selectedClass === 'Verdant Oracle') emojiObj = '🌿';
-      else if (selectedClass === 'Wind Knight') emojiObj = '💨';
+    if (selectedClass === 'Beat Performer') {
+      emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
+    } else if (selectedClass === 'Frost Mage') {
+      emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
+    } else if (selectedClass === 'Heavy Guardian') {
+      emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
+    } else if (selectedClass === 'Marksman') {
+      emojiObj = { name: 'Marksman', id: '1460272594275012671' };
+    } else if (selectedClass === 'Shield Knight') {
+      emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
+    } else if (selectedClass === 'Stormblade') {
+      emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
+    } else if (selectedClass === 'Verdant Oracle') {
+      emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
+    } else if (selectedClass === 'Wind Knight') {
+      emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
     }
 
     const subclassOptions = subclasses.map(sub => ({
@@ -555,28 +550,26 @@ async function handleManualBackToClass(interaction) {
     state.timestamp = Date.now();
     manualRegState.set(interaction.user.id, state);
 
-    // ✅ FIX: Use custom emojis from your server
+    // ✅ FIX: Hardcoded custom emoji IDs
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
       let emojiObj = undefined;
       
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
-      
-      // Fallback to simple emoji
-      if (!emojiObj) {
-        if (className === 'Beat Performer') emojiObj = '🎵';
-        else if (className === 'Frost Mage') emojiObj = '❄️';
-        else if (className === 'Heavy Guardian') emojiObj = '🛡️';
-        else if (className === 'Marksman') emojiObj = '🏹';
-        else if (className === 'Shield Knight') emojiObj = '⚔️';
-        else if (className === 'Stormblade') emojiObj = '⚡';
-        else if (className === 'Verdant Oracle') emojiObj = '🌿';
-        else if (className === 'Wind Knight') emojiObj = '💨';
+      if (className === 'Beat Performer') {
+        emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
+      } else if (className === 'Frost Mage') {
+        emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
+      } else if (className === 'Heavy Guardian') {
+        emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
+      } else if (className === 'Marksman') {
+        emojiObj = { name: 'Marksman', id: '1460272594275012671' };
+      } else if (className === 'Shield Knight') {
+        emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
+      } else if (className === 'Stormblade') {
+        emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
+      } else if (className === 'Verdant Oracle') {
+        emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
+      } else if (className === 'Wind Knight') {
+        emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
       }
 
       return {
@@ -639,27 +632,24 @@ async function handleManualBackToSubclass(interaction) {
     const subclasses = CLASSES[state.class].subclasses;
     const classRole = CLASSES[state.class].role;
     
-    // ✅ FIX: Use custom emojis from your server
-    const classEmoji = getClassEmoji(state.class);
+    // ✅ FIX: Hardcoded custom emoji IDs
     let emojiObj = undefined;
-    
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
-    
-    // Fallback to simple emoji
-    if (!emojiObj) {
-      if (state.class === 'Beat Performer') emojiObj = '🎵';
-      else if (state.class === 'Frost Mage') emojiObj = '❄️';
-      else if (state.class === 'Heavy Guardian') emojiObj = '🛡️';
-      else if (state.class === 'Marksman') emojiObj = '🏹';
-      else if (state.class === 'Shield Knight') emojiObj = '⚔️';
-      else if (state.class === 'Stormblade') emojiObj = '⚡';
-      else if (state.class === 'Verdant Oracle') emojiObj = '🌿';
-      else if (state.class === 'Wind Knight') emojiObj = '💨';
+    if (state.class === 'Beat Performer') {
+      emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
+    } else if (state.class === 'Frost Mage') {
+      emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
+    } else if (state.class === 'Heavy Guardian') {
+      emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
+    } else if (state.class === 'Marksman') {
+      emojiObj = { name: 'Marksman', id: '1460272594275012671' };
+    } else if (state.class === 'Shield Knight') {
+      emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
+    } else if (state.class === 'Stormblade') {
+      emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
+    } else if (state.class === 'Verdant Oracle') {
+      emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
+    } else if (state.class === 'Wind Knight') {
+      emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
     }
 
     const subclassOptions = subclasses.map(sub => ({
