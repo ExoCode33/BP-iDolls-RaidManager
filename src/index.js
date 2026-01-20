@@ -26,6 +26,7 @@ const {
   handlePresetMenu,
   handleLockUnlockMenu,
   handleEmbedMenu,
+  handleRosterMenu,
   handleTimeSelect,
   handleSizeSelect,
   handleChannelSelect,
@@ -38,6 +39,8 @@ const {
   handleNameModal,
   handleDateModal
 } = require('./events/interactions');
+
+const { handleRosterSelect, handleRosterPromote, handleRosterDemote, handleRosterUnregister } = require('./events/raid-handlers/roster-handlers');
 
 const client = new Client({
   intents: [
@@ -291,6 +294,11 @@ const INTERACTION_HANDLERS = {
     'raid_preset_menu_': handlePresetMenu,
     'raid_lock_unlock_menu_': handleLockUnlockMenu,
     'raid_embed_menu_': handleEmbedMenu,
+    'raid_roster_menu_': handleRosterMenu,
+    'raid_roster_select_': handleRosterSelect,
+    'raid_roster_promote_': handleRosterPromote,
+    'raid_roster_demote_': handleRosterDemote,
+    'raid_roster_unregister_': handleRosterUnregister,
     'raid_create_time_': handleTimeSelect,
     'raid_create_size_': handleSizeSelect,
     'raid_create_channel_': handleChannelSelect,
