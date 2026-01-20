@@ -220,7 +220,7 @@ async function handleButton(interaction) {
 
 async function showManualClassSelection(interaction, raidId, registrationType) {
   // ✅ FIX: Can be called from button OR from dropdown
-  if (!raidId) {
+  if (!raidId || isNaN(raidId)) {
     const parts = interaction.customId.split('_');
     raidId = parseInt(parts[2]);
     registrationType = parts[3];
@@ -240,25 +240,36 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       timestamp: Date.now()
     });
 
-    // ✅ FIX: Use simple emojis instead of custom emojis
+    // ✅ FIX: Use custom emojis from your server
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      let emoji = undefined;
+      const emoji = getClassEmoji(className);
+      let emojiObj = undefined;
       
-      // Map class to simple emoji
-      if (className === 'Beat Performer') emoji = '🎵';
-      else if (className === 'Frost Mage') emoji = '❄️';
-      else if (className === 'Heavy Guardian') emoji = '🛡️';
-      else if (className === 'Marksman') emoji = '🏹';
-      else if (className === 'Shield Knight') emoji = '⚔️';
-      else if (className === 'Stormblade') emoji = '⚡';
-      else if (className === 'Verdant Oracle') emoji = '🌿';
-      else if (className === 'Wind Knight') emoji = '💨';
+      // Try to parse custom emoji
+      if (emoji) {
+        const match = emoji.match(/<:(\w+):(\d+)>/);
+        if (match) {
+          emojiObj = { name: match[1], id: match[2] };
+        }
+      }
+      
+      // Fallback to simple emoji if custom emoji fails
+      if (!emojiObj) {
+        if (className === 'Beat Performer') emojiObj = '🎵';
+        else if (className === 'Frost Mage') emojiObj = '❄️';
+        else if (className === 'Heavy Guardian') emojiObj = '🛡️';
+        else if (className === 'Marksman') emojiObj = '🏹';
+        else if (className === 'Shield Knight') emojiObj = '⚔️';
+        else if (className === 'Stormblade') emojiObj = '⚡';
+        else if (className === 'Verdant Oracle') emojiObj = '🌿';
+        else if (className === 'Wind Knight') emojiObj = '💨';
+      }
 
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emoji
+        emoji: emojiObj
       };
     });
 
@@ -315,22 +326,34 @@ async function handleManualClassSelect(interaction) {
     const subclasses = CLASSES[selectedClass].subclasses;
     const classRole = CLASSES[selectedClass].role;
     
-    // ✅ FIX: Use simple emojis based on class
-    let emoji = undefined;
-    if (selectedClass === 'Beat Performer') emoji = '🎵';
-    else if (selectedClass === 'Frost Mage') emoji = '❄️';
-    else if (selectedClass === 'Heavy Guardian') emoji = '🛡️';
-    else if (selectedClass === 'Marksman') emoji = '🏹';
-    else if (selectedClass === 'Shield Knight') emoji = '⚔️';
-    else if (selectedClass === 'Stormblade') emoji = '⚡';
-    else if (selectedClass === 'Verdant Oracle') emoji = '🌿';
-    else if (selectedClass === 'Wind Knight') emoji = '💨';
+    // ✅ FIX: Use custom emojis from your server
+    const classEmoji = getClassEmoji(selectedClass);
+    let emojiObj = undefined;
+    
+    if (classEmoji) {
+      const match = classEmoji.match(/<:(\w+):(\d+)>/);
+      if (match) {
+        emojiObj = { name: match[1], id: match[2] };
+      }
+    }
+    
+    // Fallback to simple emoji if custom emoji fails
+    if (!emojiObj) {
+      if (selectedClass === 'Beat Performer') emojiObj = '🎵';
+      else if (selectedClass === 'Frost Mage') emojiObj = '❄️';
+      else if (selectedClass === 'Heavy Guardian') emojiObj = '🛡️';
+      else if (selectedClass === 'Marksman') emojiObj = '🏹';
+      else if (selectedClass === 'Shield Knight') emojiObj = '⚔️';
+      else if (selectedClass === 'Stormblade') emojiObj = '⚡';
+      else if (selectedClass === 'Verdant Oracle') emojiObj = '🌿';
+      else if (selectedClass === 'Wind Knight') emojiObj = '💨';
+    }
 
     const subclassOptions = subclasses.map(sub => ({
       label: sub,
       value: sub,
       description: classRole,
-      emoji: emoji
+      emoji: emojiObj
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -532,24 +555,35 @@ async function handleManualBackToClass(interaction) {
     state.timestamp = Date.now();
     manualRegState.set(interaction.user.id, state);
 
-    // ✅ FIX: Use simple emojis
+    // ✅ FIX: Use custom emojis from your server
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      let emoji = undefined;
+      const emoji = getClassEmoji(className);
+      let emojiObj = undefined;
       
-      if (className === 'Beat Performer') emoji = '🎵';
-      else if (className === 'Frost Mage') emoji = '❄️';
-      else if (className === 'Heavy Guardian') emoji = '🛡️';
-      else if (className === 'Marksman') emoji = '🏹';
-      else if (className === 'Shield Knight') emoji = '⚔️';
-      else if (className === 'Stormblade') emoji = '⚡';
-      else if (className === 'Verdant Oracle') emoji = '🌿';
-      else if (className === 'Wind Knight') emoji = '💨';
+      if (emoji) {
+        const match = emoji.match(/<:(\w+):(\d+)>/);
+        if (match) {
+          emojiObj = { name: match[1], id: match[2] };
+        }
+      }
+      
+      // Fallback to simple emoji
+      if (!emojiObj) {
+        if (className === 'Beat Performer') emojiObj = '🎵';
+        else if (className === 'Frost Mage') emojiObj = '❄️';
+        else if (className === 'Heavy Guardian') emojiObj = '🛡️';
+        else if (className === 'Marksman') emojiObj = '🏹';
+        else if (className === 'Shield Knight') emojiObj = '⚔️';
+        else if (className === 'Stormblade') emojiObj = '⚡';
+        else if (className === 'Verdant Oracle') emojiObj = '🌿';
+        else if (className === 'Wind Knight') emojiObj = '💨';
+      }
 
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emoji
+        emoji: emojiObj
       };
     });
 
@@ -605,22 +639,34 @@ async function handleManualBackToSubclass(interaction) {
     const subclasses = CLASSES[state.class].subclasses;
     const classRole = CLASSES[state.class].role;
     
-    // ✅ FIX: Use simple emojis
-    let emoji = undefined;
-    if (state.class === 'Beat Performer') emoji = '🎵';
-    else if (state.class === 'Frost Mage') emoji = '❄️';
-    else if (state.class === 'Heavy Guardian') emoji = '🛡️';
-    else if (state.class === 'Marksman') emoji = '🏹';
-    else if (state.class === 'Shield Knight') emoji = '⚔️';
-    else if (state.class === 'Stormblade') emoji = '⚡';
-    else if (state.class === 'Verdant Oracle') emoji = '🌿';
-    else if (state.class === 'Wind Knight') emoji = '💨';
+    // ✅ FIX: Use custom emojis from your server
+    const classEmoji = getClassEmoji(state.class);
+    let emojiObj = undefined;
+    
+    if (classEmoji) {
+      const match = classEmoji.match(/<:(\w+):(\d+)>/);
+      if (match) {
+        emojiObj = { name: match[1], id: match[2] };
+      }
+    }
+    
+    // Fallback to simple emoji
+    if (!emojiObj) {
+      if (state.class === 'Beat Performer') emojiObj = '🎵';
+      else if (state.class === 'Frost Mage') emojiObj = '❄️';
+      else if (state.class === 'Heavy Guardian') emojiObj = '🛡️';
+      else if (state.class === 'Marksman') emojiObj = '🏹';
+      else if (state.class === 'Shield Knight') emojiObj = '⚔️';
+      else if (state.class === 'Stormblade') emojiObj = '⚡';
+      else if (state.class === 'Verdant Oracle') emojiObj = '🌿';
+      else if (state.class === 'Wind Knight') emojiObj = '💨';
+    }
 
     const subclassOptions = subclasses.map(sub => ({
       label: sub,
       value: sub,
       description: classRole,
-      emoji: emoji
+      emoji: emojiObj
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
