@@ -144,6 +144,18 @@ async function handleComplete(interaction, raid) {
     }
   }
 
+  // ✅ NEW: Delete lock notification message if it exists
+  if (raid.lock_notification_message_id && raid.channel_id) {
+    try {
+      const channel = await interaction.client.channels.fetch(raid.channel_id);
+      const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
+      await lockMessage.delete();
+      console.log(`✅ Deleted lock notification message for raid ${raid.id}`);
+    } catch (err) {
+      console.error('Failed to delete lock notification message:', err);
+    }
+  }
+
   const backButton = new ButtonBuilder()
     .setCustomId(`raid_back_to_main_${interaction.user.id}`)
     .setLabel('◀️ Back to Main Menu')
@@ -183,6 +195,18 @@ async function handleCancel(interaction, raid) {
       await message.delete();
     } catch (err) {
       console.error('Failed to delete raid message:', err);
+    }
+  }
+
+  // ✅ NEW: Delete lock notification message if it exists
+  if (raid.lock_notification_message_id && raid.channel_id) {
+    try {
+      const channel = await interaction.client.channels.fetch(raid.channel_id);
+      const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
+      await lockMessage.delete();
+      console.log(`✅ Deleted lock notification message for raid ${raid.id}`);
+    } catch (err) {
+      console.error('Failed to delete lock notification message:', err);
     }
   }
 
