@@ -18,19 +18,23 @@ async function createRaidEmbed(raid, registrations) {
 
   // Separate by role and status
   const registered = registrations.filter(r => r.status === 'registered');
+  const assist = registrations.filter(r => r.status === 'assist');
   const waitlist = registrations.filter(r => r.status === 'waitlist');
 
+  // Combine registered and assist for display (both are in the raid)
+  const inRaid = [...registered, ...assist];
+
   // Count by role
-  const tanks = registered.filter(r => r.role && r.role.toLowerCase() === 'tank');
-  const supports = registered.filter(r => r.role && r.role.toLowerCase() === 'support');
-  const dps = registered.filter(r => r.role && r.role.toLowerCase() === 'dps');
+  const tanks = inRaid.filter(r => r.role && r.role.toLowerCase() === 'tank');
+  const supports = inRaid.filter(r => r.role && r.role.toLowerCase() === 'support');
+  const dps = inRaid.filter(r => r.role && r.role.toLowerCase() === 'dps');
 
   // Tank section with reserved spots
   const tankMax = 2;
   let tankText = '';
   if (tanks.length > 0) {
     try {
-      tankText = (await Promise.all(tanks.map(t => formatPlayer(t, false)))).join('\n');
+      tankText = (await Promise.all(tanks.map(t => formatPlayer(t)))).join('\n');
     } catch (err) {
       console.error('Error formatting tanks:', err);
       tankText = tanks.map(t => `${t.ign}`).join('\n');
@@ -52,7 +56,7 @@ async function createRaidEmbed(raid, registrations) {
   let supportText = '';
   if (supports.length > 0) {
     try {
-      supportText = (await Promise.all(supports.map(s => formatPlayer(s, false)))).join('\n');
+      supportText = (await Promise.all(supports.map(s => formatPlayer(s)))).join('\n');
     } catch (err) {
       console.error('Error formatting supports:', err);
       supportText = supports.map(s => `${s.ign}`).join('\n');
@@ -74,7 +78,7 @@ async function createRaidEmbed(raid, registrations) {
   let dpsText = '';
   if (dps.length > 0) {
     try {
-      dpsText = (await Promise.all(dps.map(d => formatPlayer(d, false)))).join('\n');
+      dpsText = (await Promise.all(dps.map(d => formatPlayer(d)))).join('\n');
     } catch (err) {
       console.error('Error formatting dps:', err);
       dpsText = dps.map(d => `${d.ign}`).join('\n');
@@ -94,7 +98,7 @@ async function createRaidEmbed(raid, registrations) {
   // Waitlist section
   if (waitlist.length > 0) {
     try {
-      const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w, true)))).join('\n');
+      const waitlistText = (await Promise.all(waitlist.map(w => formatPlayer(w)))).join('\n');
       embed.addFields({ 
         name: `⏳ Waitlist (${waitlist.length})`, 
         value: waitlistText, 
@@ -102,7 +106,7 @@ async function createRaidEmbed(raid, registrations) {
       });
     } catch (err) {
       console.error('Error formatting waitlist:', err);
-      const waitlistText = waitlist.map(w => `${w.ign} [Assist]`).join('\n');
+      const waitlistText = waitlist.map(w => `${w.ign}`).join('\n');
       embed.addFields({ 
         name: `⏳ Waitlist (${waitlist.length})`, 
         value: waitlistText, 
@@ -118,12 +122,13 @@ async function createRaidEmbed(raid, registrations) {
   return embed;
 }
 
-async function formatPlayer(registration, isAssist) {
+async function formatPlayer(registration) {
   // Use data directly from registration object
   const ign = registration.ign || 'Unknown';
   const className = registration.class || '';
   const subclass = registration.subclass || '';
   const score = registration.ability_score || '';
+  const isAssist = registration.registration_type === 'assist';
   
   // Get custom emoji using the class name (e.g., "Beat Performer")
   const classEmoji = getClassEmoji(className);
@@ -258,8 +263,8 @@ function createRaidButtons(raidId, isLocked) {
     .setStyle(ButtonStyle.Success)
     .setDisabled(isLocked);
 
-  const helpButton = new ButtonBuilder()
-    .setCustomId(`help_${raidId}`)
+  const assistButton = new ButtonBuilder()
+    .setCustomId(`assist_${raidId}`)
     .setLabel('I can help')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(isLocked);
@@ -271,7 +276,7 @@ function createRaidButtons(raidId, isLocked) {
 
   return new ActionRowBuilder().addComponents(
     registerButton,
-    helpButton,
+    assistButton,
     unregisterButton
   );
 }
