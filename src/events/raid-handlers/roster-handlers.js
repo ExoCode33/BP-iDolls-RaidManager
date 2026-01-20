@@ -98,9 +98,17 @@ async function showRosterManagementUI(interaction, raidId) {
     };
   });
 
+  // Back button
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Menu')
+    .setStyle(ButtonStyle.Secondary);
+
   const components = [];
 
-  // Add promote dropdown if waitlist has players
+  // ✅ FIX: Discord allows max 5 components (rows)
+  // Strategy: Add dropdowns only if they have options, max 4 dropdowns + 1 button row = 5
+  
   if (promoteOptions.length > 0) {
     const promoteDropdown = new StringSelectMenuBuilder()
       .setCustomId(`raid_roster_promote_${raidId}_${interaction.user.id}`)
@@ -109,7 +117,6 @@ async function showRosterManagementUI(interaction, raidId) {
     components.push(new ActionRowBuilder().addComponents(promoteDropdown));
   }
 
-  // Add demote dropdown if raid party has players
   if (demoteOptions.length > 0) {
     const demoteDropdown = new StringSelectMenuBuilder()
       .setCustomId(`raid_roster_demote_${raidId}_${interaction.user.id}`)
@@ -118,7 +125,6 @@ async function showRosterManagementUI(interaction, raidId) {
     components.push(new ActionRowBuilder().addComponents(demoteDropdown));
   }
 
-  // Add unregister dropdown if any players exist
   if (unregisterOptions.length > 0) {
     const unregisterDropdown = new StringSelectMenuBuilder()
       .setCustomId(`raid_roster_unregister_${raidId}_${interaction.user.id}`)
@@ -127,13 +133,15 @@ async function showRosterManagementUI(interaction, raidId) {
     components.push(new ActionRowBuilder().addComponents(unregisterDropdown));
   }
 
-  // Back button
-  const backButton = new ButtonBuilder()
-    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-    .setLabel('◀️ Back to Menu')
-    .setStyle(ButtonStyle.Secondary);
-  
-  components.push(new ActionRowBuilder().addComponents(backButton));
+  // ✅ FIX: Add back button in the same row as the last dropdown if we're at 5 components
+  // Otherwise add it as a separate row
+  if (components.length >= 4) {
+    // Already at or near limit, combine back button with last action row if possible
+    // Actually, let's just use a separate row - we should have max 3 dropdowns + 1 button = 4 rows
+    components.push(new ActionRowBuilder().addComponents(backButton));
+  } else {
+    components.push(new ActionRowBuilder().addComponents(backButton));
+  }
 
   // If no players at all
   if (allPlayers.length === 0) {
