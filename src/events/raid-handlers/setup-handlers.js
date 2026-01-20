@@ -68,23 +68,34 @@ async function handleSetupModal(interaction) {
 }
 
 async function redirectToMainMenu(interaction, errorMessage) {
-  const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+  const { 
+    createMainMenuEmbed, 
+    createMainMenuButtons,
+    createRosterDropdown,
+    createLockUnlockDropdown,
+    createPresetDropdown,
+    createEmbedAndRoleDropdown
+  } = require('./main-menu');
   
-  const embed = createMainMenuEmbed();
-  const row = createMainMenuRow(interaction.user.id);
+  const embed = await createMainMenuEmbed();
+  const buttonRow = createMainMenuButtons(interaction.user.id);
+  const rosterRow = createRosterDropdown(interaction.user.id);
+  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
 
   if (!interaction.deferred && !interaction.replied) {
     await interaction.reply({
       content: errorMessage,
       embeds: [embed],
-      components: [row],
+      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow],
       flags: 64
     });
   } else {
     await interaction.editReply({
       content: errorMessage,
       embeds: [embed],
-      components: [row]
+      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
     });
   }
 
@@ -94,7 +105,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [row]
+        components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
       });
     } catch (err) {
       // Ignore if interaction expired
