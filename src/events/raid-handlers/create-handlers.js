@@ -33,7 +33,8 @@ async function handleNameModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await interaction.deferReply({ flags: 64 });
+  // ✅ FIX: Use deferUpdate to update existing message instead of creating new one
+  await interaction.deferUpdate();
 
   try {
     const name = interaction.fields.getTextInputValue('name');
@@ -43,12 +44,7 @@ async function handleNameModal(interaction) {
     state.step = 'date';
     raidCreationState.set(interaction.user.id, state);
 
-    // Show date input as a text input in the reply (can't show modal from modal)
-    await interaction.editReply({
-      content: `**Step 2/5:** Please enter the date\n**Name:** ${name}\n\nPlease click the button below to enter the date.`
-    });
-
-    // Instead, show a button that will trigger the date modal
+    // Show date input button
     const dateButton = new ButtonBuilder()
       .setCustomId(`raid_date_button_${interaction.user.id}`)
       .setLabel('📅 Enter Date')
@@ -75,7 +71,8 @@ async function handleDateModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await interaction.deferReply({ flags: 64 });
+  // ✅ FIX: Use deferUpdate to update existing message instead of creating new one
+  await interaction.deferUpdate();
 
   try {
     const date = interaction.fields.getTextInputValue('date');
