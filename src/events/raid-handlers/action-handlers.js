@@ -279,23 +279,23 @@ async function redirectToMainMenu(interaction, errorMessage) {
   const { 
     createMainMenuEmbed, 
     createMainMenuButtons,
-    createRoleConfigDropdown,
-    createPresetDropdown,
+    createRosterDropdown,
     createLockUnlockDropdown,
-    createEmbedDropdown
+    createPresetDropdown,
+    createEmbedAndRoleDropdown
   } = require('./main-menu');
   
   const embed = await createMainMenuEmbed();
   const buttonRow = createMainMenuButtons(interaction.user.id);
-  const roleRow = createRoleConfigDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
+  const rosterRow = createRosterDropdown(interaction.user.id);
   const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const embedRow = createEmbedDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: errorMessage,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+    components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
   });
 
   // Auto-remove error message after 3 seconds
@@ -304,7 +304,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+        components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
       });
     } catch (err) {
       // Ignore if interaction expired
