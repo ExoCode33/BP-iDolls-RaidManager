@@ -4,7 +4,7 @@ const classEmojis = {
   'Heavy Guardian': '<:HeavyGuardian:1460272595264995458>',
   'Marksman': '<:Marksman:1460272594275012671>',
   'Shield Knight': '<:ShieldKnight:1460272593306255465>',
-  'Storm Blade': '<:StormBlade:1460272591473348618>',
+  'Stormblade': '<:StormBlade:1460272591473348618>',
   'Verdant Oracle': '<:VerdantOracle:1460272589296504916>',
   'Wind Knight': '<:WindKnight:1460272588779913428>'
 };
