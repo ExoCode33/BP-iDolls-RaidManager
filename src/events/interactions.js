@@ -260,35 +260,40 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       timestamp: Date.now()
     });
 
-    // ✅ FIX: Use YOUR server's custom emoji IDs (hardcoded)
-    const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      let emojiObj = undefined;
-      
-      // Hardcoded custom emoji IDs from your server
-      if (className === 'Beat Performer') {
-        emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
-      } else if (className === 'Frost Mage') {
-        emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
-      } else if (className === 'Heavy Guardian') {
-        emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
-      } else if (className === 'Marksman') {
-        emojiObj = { name: 'Marksman', id: '1460272594275012671' };
-      } else if (className === 'Shield Knight') {
-        emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
-      } else if (className === 'Stormblade') {
-        emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
-      } else if (className === 'Verdant Oracle') {
-        emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
-      } else if (className === 'Wind Knight') {
-        emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
-      }
+    // ✅ FIX: Use YOUR server's custom emoji IDs (hardcoded) with validation
+    const emojiMap = {
+      'Beat Performer': { name: 'BeatPerformer', id: '1460272597538181254' },
+      'Frost Mage': { name: 'FrostMage', id: '1460272596523159695' },
+      'Heavy Guardian': { name: 'HeavyGuardian', id: '1460272595264995458' },
+      'Marksman': { name: 'Marksman', id: '1460272594275012671' },
+      'Shield Knight': { name: 'ShieldKnight', id: '1460272593306255465' },
+      'Stormblade': { name: 'StormBlade', id: '1460272591473348618' },
+      'Verdant Oracle': { name: 'VerdantOracle', id: '1460272589296504916' },
+      'Wind Knight': { name: 'WindKnight', id: '1460272588779913428' }
+    };
 
-      return {
+    const classOptions = Object.entries(CLASSES).map(([className, data]) => {
+      const option = {
         label: className,
         value: className,
-        description: data.role,
-        emoji: emojiObj
+        description: data.role
       };
+      
+      // Only add emoji if it exists and has valid ID
+      const emojiObj = emojiMap[className];
+      if (emojiObj && emojiObj.id && emojiObj.id.length > 0) {
+        // Validate the emoji exists in the guild
+        try {
+          const emoji = interaction.guild.emojis.cache.get(emojiObj.id);
+          if (emoji) {
+            option.emoji = emojiObj;
+          }
+        } catch (err) {
+          console.warn(`⚠️ Emoji not found for ${className}: ${emojiObj.id}`);
+        }
+      }
+      
+      return option;
     });
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -344,32 +349,45 @@ async function handleManualClassSelect(interaction) {
     const subclasses = CLASSES[selectedClass].subclasses;
     const classRole = CLASSES[selectedClass].role;
     
-    // ✅ FIX: Hardcoded custom emoji IDs
+    // ✅ FIX: Validate emoji before adding to options
+    const emojiMap = {
+      'Beat Performer': { name: 'BeatPerformer', id: '1460272597538181254' },
+      'Frost Mage': { name: 'FrostMage', id: '1460272596523159695' },
+      'Heavy Guardian': { name: 'HeavyGuardian', id: '1460272595264995458' },
+      'Marksman': { name: 'Marksman', id: '1460272594275012671' },
+      'Shield Knight': { name: 'ShieldKnight', id: '1460272593306255465' },
+      'Stormblade': { name: 'StormBlade', id: '1460272591473348618' },
+      'Verdant Oracle': { name: 'VerdantOracle', id: '1460272589296504916' },
+      'Wind Knight': { name: 'WindKnight', id: '1460272588779913428' }
+    };
+
     let emojiObj = undefined;
-    if (selectedClass === 'Beat Performer') {
-      emojiObj = { name: 'BeatPerformer', id: '1460272597538181254' };
-    } else if (selectedClass === 'Frost Mage') {
-      emojiObj = { name: 'FrostMage', id: '1460272596523159695' };
-    } else if (selectedClass === 'Heavy Guardian') {
-      emojiObj = { name: 'HeavyGuardian', id: '1460272595264995458' };
-    } else if (selectedClass === 'Marksman') {
-      emojiObj = { name: 'Marksman', id: '1460272594275012671' };
-    } else if (selectedClass === 'Shield Knight') {
-      emojiObj = { name: 'ShieldKnight', id: '1460272593306255465' };
-    } else if (selectedClass === 'Stormblade') {
-      emojiObj = { name: 'StormBlade', id: '1460272591473348618' };
-    } else if (selectedClass === 'Verdant Oracle') {
-      emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
-    } else if (selectedClass === 'Wind Knight') {
-      emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
+    const emojiData = emojiMap[selectedClass];
+    if (emojiData && emojiData.id && emojiData.id.length > 0) {
+      try {
+        const emoji = interaction.guild.emojis.cache.get(emojiData.id);
+        if (emoji) {
+          emojiObj = emojiData;
+        }
+      } catch (err) {
+        console.warn(`⚠️ Emoji not found for ${selectedClass}: ${emojiData.id}`);
+      }
     }
 
-    const subclassOptions = subclasses.map(sub => ({
-      label: sub,
-      value: sub,
-      description: classRole,
-      emoji: emojiObj
-    }));
+    const subclassOptions = subclasses.map(sub => {
+      const option = {
+        label: sub,
+        value: sub,
+        description: classRole
+      };
+      
+      // Only add emoji if validated
+      if (emojiObj) {
+        option.emoji = emojiObj;
+      }
+      
+      return option;
+    });
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`manual_select_subclass_${interaction.user.id}`)
