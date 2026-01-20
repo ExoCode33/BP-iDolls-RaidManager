@@ -8,17 +8,17 @@ async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
     .setColor(0xEC4899);
   
-  // ✅ NEW: Title with lock emoji at the end
+  // ✅ Title with lock emoji at the end - bigger and bolder
   const lockEmoji = raid.locked ? '🔒' : '🔓';
   const lockStatus = raid.locked ? 'Registration Closed' : 'Registration Open';
-  embed.setTitle(`${raid.name} • ${lockStatus} ${lockEmoji}`);
+  embed.setTitle(`**${raid.name} • ${lockStatus}** ${lockEmoji}`);
   
-  // ✅ NEW: Description with date, relative timestamp, and raid role
+  // ✅ Description with spacing adjustments
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   
   embed.setDescription(
-    `📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
+    `\n📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n👤 Raid Role • <@&${raid.main_role_id}>\n`
   );
 
   // Separate by role and status
