@@ -90,7 +90,7 @@ async function createMainMenuEmbed() {
 function createMainMenuButtons(userId) {
   const startButton = new ButtonBuilder()
     .setCustomId(`raid_quick_start_${userId}`)
-    .setLabel('🚀 Start Raid')
+    .setLabel('📤 Post Raid')
     .setStyle(ButtonStyle.Success);
 
   const completeButton = new ButtonBuilder()
@@ -106,16 +106,38 @@ function createMainMenuButtons(userId) {
   return new ActionRowBuilder().addComponents(startButton, completeButton, editButton);
 }
 
-function createRoleConfigDropdown(userId) {
+function createRosterDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_role_config_${userId}`)
-    .setPlaceholder('⚙️ Role Configuration')
+    .setCustomId(`raid_roster_menu_${userId}`)
+    .setPlaceholder('🛠️ Roster Management')
     .addOptions([
       {
-        label: '⚙️ Configure Raid Roles',
-        value: 'setup',
-        description: 'Set Raid 1 and Raid 2 role IDs',
-        emoji: '⚙️'
+        label: '🛠️ Manage Roster',
+        value: 'manage',
+        description: 'Promote, demote, or remove players',
+        emoji: '🛠️'
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
+function createLockUnlockDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_lock_unlock_menu_${userId}`)
+    .setPlaceholder('🔒 Lock / Unlock Raid')
+    .addOptions([
+      {
+        label: '🔒 Lock Raid',
+        value: 'lock',
+        description: 'Prevent new registrations',
+        emoji: '🔒'
+      },
+      {
+        label: '🔓 Unlock Raid',
+        value: 'unlock',
+        description: 'Allow registrations',
+        emoji: '🔓'
       }
     ]);
 
@@ -150,33 +172,17 @@ function createPresetDropdown(userId) {
   return new ActionRowBuilder().addComponents(dropdown);
 }
 
-function createLockUnlockDropdown(userId) {
-  const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_lock_unlock_menu_${userId}`)
-    .setPlaceholder('🔒 Lock / Unlock')
-    .addOptions([
-      {
-        label: '🔒 Lock Raid',
-        value: 'lock',
-        description: 'Prevent new registrations',
-        emoji: '🔒'
-      },
-      {
-        label: '🔓 Unlock Raid',
-        value: 'unlock',
-        description: 'Allow registrations',
-        emoji: '🔓'
-      }
-    ]);
-
-  return new ActionRowBuilder().addComponents(dropdown);
-}
-
-function createEmbedAndRosterDropdown(userId) {
+function createEmbedAndRoleDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
     .setCustomId(`raid_management_menu_${userId}`)
-    .setPlaceholder('📺 Embed & Roster Management')
+    .setPlaceholder('📺 Embed & Role Management')
     .addOptions([
+      {
+        label: '⚙️ Configure Raid Roles',
+        value: 'setup',
+        description: 'Set Raid 1 and Raid 2 role IDs',
+        emoji: '⚙️'
+      },
       {
         label: '🔄 Refresh Embed',
         value: 'refresh',
@@ -188,12 +194,6 @@ function createEmbedAndRosterDropdown(userId) {
         value: 'repost',
         description: 'Restore deleted embed',
         emoji: '📝'
-      },
-      {
-        label: '🛠️ Manage Roster',
-        value: 'roster',
-        description: 'Promote, demote, or remove players',
-        emoji: '🛠️'
       }
     ]);
 
@@ -272,6 +272,11 @@ async function handleManagementMenu(interaction) {
 
   try {
     switch (action) {
+      case 'setup':
+        const setupHandlers = require('./setup-handlers');
+        await setupHandlers.showSetupModal(interaction);
+        break;
+        
       case 'refresh':
         await showRaidSelector(interaction, 'refresh', '🔄 Refresh Embed');
         break;
@@ -279,14 +284,21 @@ async function handleManagementMenu(interaction) {
       case 'repost':
         await showRaidSelector(interaction, 'repost', '📝 Repost Embed');
         break;
-      
-      case 'roster':
-        await showRosterRaidSelector(interaction);
-        break;
     }
   } catch (error) {
     console.error('Management menu error:', error);
     await redirectToMainMenu(interaction, '❌ An error occurred!');
+  }
+}
+
+async function handleRosterMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  const action = interaction.values[0];
+
+  if (action === 'manage') {
+    await showRosterRaidSelector(interaction);
   }
 }
 
@@ -597,15 +609,15 @@ async function handleBackToMain(interaction) {
 
   const embed = await createMainMenuEmbed();
   const buttonRow = createMainMenuButtons(interaction.user.id);
-  const roleRow = createRoleConfigDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
+  const rosterRow = createRosterDropdown(interaction.user.id);
   const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const managementRow = createEmbedAndRosterDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: null,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockUnlockRow, managementRow]
+    components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
   });
 }
 
@@ -679,11 +691,11 @@ async function redirectToMainMenu(interaction, errorMessage) {
 module.exports = {
   createMainMenuEmbed,
   createMainMenuButtons,
-  createRoleConfigDropdown,
-  createPresetDropdown,
+  createRosterDropdown,
   createLockUnlockDropdown,
-  createEmbedAndRosterDropdown,
-  handleRoleConfigMenu,
+  createPresetDropdown,
+  createEmbedAndRoleDropdown,
+  handleRosterMenu,
   handlePresetMenu,
   handleLockUnlockMenu,
   handleManagementMenu,
