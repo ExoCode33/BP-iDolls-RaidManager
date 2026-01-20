@@ -120,17 +120,38 @@ async function handleComplete(interaction, raid) {
 
   // Remove Discord role from all participants
   const guild = interaction.guild;
-  const role = guild.roles.cache.get(raid.main_role_id);
   
-  if (role) {
-    const members = role.members;
-    for (const [memberId, member] of members) {
-      try {
-        await member.roles.remove(role);
-      } catch (err) {
-        console.error(`Failed to remove role from ${memberId}:`, err);
+  try {
+    const role = await guild.roles.fetch(raid.main_role_id);
+    
+    if (role) {
+      console.log(`🧹 [COMPLETE] Removing role: ${role.name} (${role.id})`);
+      
+      // Force fetch members to ensure we have the latest list
+      await guild.members.fetch();
+      const membersWithRole = role.members;
+      
+      if (membersWithRole.size > 0) {
+        console.log(`   Removing role from ${membersWithRole.size} member(s)...`);
+        
+        for (const [memberId, member] of membersWithRole) {
+          try {
+            await member.roles.remove(role);
+            console.log(`   ✅ Removed from ${member.user.tag}`);
+          } catch (err) {
+            console.error(`   ❌ Failed to remove from ${member.user.tag}:`, err.message);
+          }
+        }
+        
+        console.log(`✅ [COMPLETE] Role cleanup complete!`);
+      } else {
+        console.log(`   No members have this role`);
       }
+    } else {
+      console.error(`❌ [COMPLETE] Role not found: ${raid.main_role_id}`);
     }
+  } catch (err) {
+    console.error(`❌ [COMPLETE] Role removal failed:`, err);
   }
 
   // Delete the raid message
@@ -186,17 +207,38 @@ async function handleCancel(interaction, raid) {
 
   // Remove Discord role
   const guild = interaction.guild;
-  const role = guild.roles.cache.get(raid.main_role_id);
   
-  if (role) {
-    const members = role.members;
-    for (const [memberId, member] of members) {
-      try {
-        await member.roles.remove(role);
-      } catch (err) {
-        console.error(`Failed to remove role from ${memberId}:`, err);
+  try {
+    const role = await guild.roles.fetch(raid.main_role_id);
+    
+    if (role) {
+      console.log(`🧹 [CANCEL] Removing role: ${role.name} (${role.id})`);
+      
+      // Force fetch members to ensure we have the latest list
+      await guild.members.fetch();
+      const membersWithRole = role.members;
+      
+      if (membersWithRole.size > 0) {
+        console.log(`   Removing role from ${membersWithRole.size} member(s)...`);
+        
+        for (const [memberId, member] of membersWithRole) {
+          try {
+            await member.roles.remove(role);
+            console.log(`   ✅ Removed from ${member.user.tag}`);
+          } catch (err) {
+            console.error(`   ❌ Failed to remove from ${member.user.tag}:`, err.message);
+          }
+        }
+        
+        console.log(`✅ [CANCEL] Role cleanup complete!`);
+      } else {
+        console.log(`   No members have this role`);
       }
+    } else {
+      console.error(`❌ [CANCEL] Role not found: ${raid.main_role_id}`);
     }
+  } catch (err) {
+    console.error(`❌ [CANCEL] Role removal failed:`, err);
   }
 
   // Delete the raid message
