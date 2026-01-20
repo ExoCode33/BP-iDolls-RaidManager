@@ -96,19 +96,63 @@ function checkInteractionCooldown(userId, action) {
   return true;
 }
 
+// ✅ FIX: Add size limits to prevent memory leaks
+const MAX_STATE_SIZE = 5000;
+const MAX_INTERACTION_SIZE = 10000;
+
 // Helper function to clean up expired manual registration state
 function cleanupExpiredState() {
   const now = Date.now();
+  
+  // Cleanup manual registration state
   for (const [userId, state] of manualRegState.entries()) {
     if (now - state.timestamp > MANUAL_REG_TTL) {
       manualRegState.delete(userId);
     }
   }
-  // ✅ NEW - Cleanup AS selection state
+  
+  // Cleanup AS selection state
   for (const [userId, state] of asSelectionState.entries()) {
     if (now - state.timestamp > AS_SELECTION_TTL) {
       asSelectionState.delete(userId);
     }
+  }
+  
+  // ✅ FIX: Emergency cleanup if Maps get too large
+  if (manualRegState.size > MAX_STATE_SIZE) {
+    console.warn(`⚠️ Manual reg state too large (${manualRegState.size}), forcing cleanup`);
+    const sortedEntries = Array.from(manualRegState.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    manualRegState.clear();
+    sortedEntries.slice(-1000).forEach(([key, value]) => {
+      manualRegState.set(key, value);
+    });
+    console.log(`✅ Cleaned up manual reg state to ${manualRegState.size} entries`);
+  }
+  
+  if (asSelectionState.size > MAX_STATE_SIZE) {
+    console.warn(`⚠️ AS selection state too large (${asSelectionState.size}), forcing cleanup`);
+    const sortedEntries = Array.from(asSelectionState.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    
+    asSelectionState.clear();
+    sortedEntries.slice(-1000).forEach(([key, value]) => {
+      asSelectionState.set(key, value);
+    });
+    console.log(`✅ Cleaned up AS selection state to ${asSelectionState.size} entries`);
+  }
+  
+  // ✅ FIX: Cleanup activeInteractions more aggressively
+  if (activeInteractions.size > MAX_INTERACTION_SIZE) {
+    console.warn(`⚠️ Active interactions too large (${activeInteractions.size}), forcing cleanup`);
+    const cutoffTime = now - (INTERACTION_COOLDOWN * 5);
+    for (const [key, timestamp] of activeInteractions.entries()) {
+      if (timestamp < cutoffTime) {
+        activeInteractions.delete(key);
+      }
+    }
+    console.log(`✅ Cleaned up active interactions to ${activeInteractions.size} entries`);
   }
 }
 
