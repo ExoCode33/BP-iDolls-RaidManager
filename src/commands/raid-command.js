@@ -2,10 +2,10 @@ const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { 
   createMainMenuEmbed,
   createMainMenuButtons,
-  createRoleConfigDropdown,
-  createPresetDropdown,
+  createRosterDropdown,
   createLockUnlockDropdown,
-  createEmbedAndRosterDropdown
+  createPresetDropdown,
+  createEmbedAndRoleDropdown
 } = require('../events/raid-handlers/main-menu');
 
 module.exports = {
@@ -19,14 +19,14 @@ module.exports = {
 
     const embed = await createMainMenuEmbed();
     const buttonRow = createMainMenuButtons(interaction.user.id);
-    const roleRow = createRoleConfigDropdown(interaction.user.id);
-    const presetRow = createPresetDropdown(interaction.user.id);
+    const rosterRow = createRosterDropdown(interaction.user.id);
     const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-    const managementRow = createEmbedAndRosterDropdown(interaction.user.id);
+    const presetRow = createPresetDropdown(interaction.user.id);
+    const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
 
     await interaction.editReply({
       embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockUnlockRow, managementRow]
+      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
     });
   }
 };
