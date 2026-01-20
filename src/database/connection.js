@@ -28,6 +28,8 @@ let mainDBConnected = false;
 let eventDBConnected = false;
 let mainDBReconnectAttempts = 0;
 let eventDBReconnectAttempts = 0;
+let mainDBReconnecting = false; // ✅ FIX: Prevent multiple reconnection attempts
+let eventDBReconnecting = false; // ✅ FIX: Prevent multiple reconnection attempts
 const MAX_RECONNECT_ATTEMPTS = 5;
 const RECONNECT_DELAY = 5000; // 5 seconds
 
@@ -36,6 +38,7 @@ mainDB.on('connect', (client) => {
   console.log('✅ Connected to Main Bot Database (READ-ONLY)');
   mainDBConnected = true;
   mainDBReconnectAttempts = 0;
+  mainDBReconnecting = false; // ✅ FIX: Reset reconnection flag
   
   // Set statement timeout for this connection
   client.query('SET statement_timeout = 10000').catch(err => {
@@ -47,8 +50,15 @@ mainDB.on('error', (err, client) => {
   console.error('❌ Main DB Error:', err);
   mainDBConnected = false;
   
+  // ✅ FIX: Prevent multiple reconnection attempts from stacking
+  if (mainDBReconnecting) {
+    console.log('ℹ️ Main DB reconnection already in progress, skipping...');
+    return;
+  }
+  
   // Attempt reconnection
   if (mainDBReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    mainDBReconnecting = true;
     mainDBReconnectAttempts++;
     console.log(`🔄 Attempting to reconnect to Main DB (attempt ${mainDBReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
     
@@ -56,12 +66,15 @@ mainDB.on('error', (err, client) => {
       try {
         await mainDB.query('SELECT 1');
         console.log('✅ Main DB reconnection successful');
+        mainDBReconnecting = false;
       } catch (reconnectErr) {
         console.error('❌ Main DB reconnection failed:', reconnectErr);
+        mainDBReconnecting = false;
       }
     }, RECONNECT_DELAY);
   } else {
     console.error('❌ Main DB: Maximum reconnection attempts reached. Manual intervention required.');
+    mainDBReconnecting = false;
   }
 });
 
@@ -73,6 +86,7 @@ eventDB.on('connect', (client) => {
   console.log('✅ Connected to Event Bot Database (READ-WRITE)');
   eventDBConnected = true;
   eventDBReconnectAttempts = 0;
+  eventDBReconnecting = false; // ✅ FIX: Reset reconnection flag
   
   // Set statement timeout for this connection
   client.query('SET statement_timeout = 10000').catch(err => {
@@ -84,8 +98,15 @@ eventDB.on('error', (err, client) => {
   console.error('❌ Event DB Error:', err);
   eventDBConnected = false;
   
+  // ✅ FIX: Prevent multiple reconnection attempts from stacking
+  if (eventDBReconnecting) {
+    console.log('ℹ️ Event DB reconnection already in progress, skipping...');
+    return;
+  }
+  
   // Attempt reconnection
   if (eventDBReconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+    eventDBReconnecting = true;
     eventDBReconnectAttempts++;
     console.log(`🔄 Attempting to reconnect to Event DB (attempt ${eventDBReconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
     
@@ -93,12 +114,15 @@ eventDB.on('error', (err, client) => {
       try {
         await eventDB.query('SELECT 1');
         console.log('✅ Event DB reconnection successful');
+        eventDBReconnecting = false;
       } catch (reconnectErr) {
         console.error('❌ Event DB reconnection failed:', reconnectErr);
+        eventDBReconnecting = false;
       }
     }, RECONNECT_DELAY);
   } else {
     console.error('❌ Event DB: Maximum reconnection attempts reached. Manual intervention required.');
+    eventDBReconnecting = false;
   }
 });
 
