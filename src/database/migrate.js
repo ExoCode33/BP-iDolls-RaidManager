@@ -30,10 +30,10 @@ CREATE TABLE IF NOT EXISTS raids (
   -- Metadata
   created_by VARCHAR(20) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW(),
   status VARCHAR(20) DEFAULT 'open' CHECK (status IN ('open', 'completed', 'cancelled')),
   reminded_30m BOOLEAN DEFAULT false,
   locked BOOLEAN DEFAULT false,
+  updated_at TIMESTAMP DEFAULT NOW(),
   preset_id INTEGER,
   
   -- Ensure only 2 active raids max (enforced in application logic)
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS raid_registrations (
   
   -- Registration details
   registration_type VARCHAR(20) DEFAULT 'register' CHECK (registration_type IN ('register', 'assist')),
-  status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist')),
+  status VARCHAR(20) DEFAULT 'registered' CHECK (status IN ('registered', 'waitlist', 'assist')),
   registered_at TIMESTAMP DEFAULT NOW(),
   
   -- One registration per user per raid
@@ -78,38 +78,30 @@ INSERT INTO bot_config (key, value) VALUES
   ('raid1_role_id', 'not_set'),
   ('raid2_role_id', 'not_set')
 ON CONFLICT (key) DO NOTHING;
+`;
 
--- Add locked column if it doesn't exist (for existing databases)
+// Migration to update existing constraint
+const updateConstraint = `
+-- Drop old constraint and add new one with 'assist' status
 DO $$ 
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'raids' AND column_name = 'locked'
+  -- Drop the old constraint if it exists
+  IF EXISTS (
+    SELECT 1 FROM information_schema.constraint_column_usage 
+    WHERE table_name = 'raid_registrations' AND constraint_name = 'raid_registrations_status_check'
   ) THEN
-    ALTER TABLE raids ADD COLUMN locked BOOLEAN DEFAULT false;
+    ALTER TABLE raid_registrations DROP CONSTRAINT raid_registrations_status_check;
+    RAISE NOTICE 'Dropped old status constraint';
   END IF;
-END $$;
-
--- Add updated_at column if it doesn't exist (for existing databases)
-DO $$ 
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'raids' AND column_name = 'updated_at'
-  ) THEN
-    ALTER TABLE raids ADD COLUMN updated_at TIMESTAMP DEFAULT NOW();
-  END IF;
-END $$;
-
--- Add preset_id column if it doesn't exist (for existing databases)
-DO $$ 
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'raids' AND column_name = 'preset_id'
-  ) THEN
-    ALTER TABLE raids ADD COLUMN preset_id INTEGER;
-  END IF;
+  
+  -- Add new constraint with 'assist' included
+  ALTER TABLE raid_registrations ADD CONSTRAINT raid_registrations_status_check 
+    CHECK (status IN ('registered', 'waitlist', 'assist'));
+  RAISE NOTICE 'Added new status constraint with assist';
+  
+EXCEPTION
+  WHEN duplicate_object THEN
+    RAISE NOTICE 'Constraint already exists with correct values';
 END $$;
 `;
 
@@ -117,6 +109,12 @@ async function migrate() {
   try {
     console.log('🔄 Running database migrations...');
     await eventDB.query(schema);
+    console.log('✅ Base schema applied');
+    
+    console.log('🔄 Updating status constraint to include assist...');
+    await eventDB.query(updateConstraint);
+    console.log('✅ Status constraint updated');
+    
     console.log('✅ Database migrations completed successfully!');
     process.exit(0);
   } catch (error) {
