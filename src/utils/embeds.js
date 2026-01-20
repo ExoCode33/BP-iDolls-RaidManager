@@ -13,30 +13,12 @@ async function createRaidEmbed(raid, registrations) {
   const lockStatus = raid.locked ? 'Registration Closed' : 'Registration Open';
   embed.setTitle(`${raid.name} • ${lockStatus} ${lockEmoji}`);
   
-  // ✅ NEW: Description with date, time until raid, and raid role
+  // ✅ NEW: Description with date, relative timestamp, and raid role
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   
-  // Calculate time until raid with minutes
-  const now = Date.now();
-  const raidTime = new Date(raid.start_time).getTime();
-  const timeUntil = raidTime - now;
-  const hoursUntil = Math.floor(timeUntil / (1000 * 60 * 60));
-  const minutesUntil = Math.floor((timeUntil % (1000 * 60 * 60)) / (1000 * 60));
-  
-  let timeUntilText;
-  if (timeUntil <= 0) {
-    timeUntilText = 'started';
-  } else if (hoursUntil > 0) {
-    timeUntilText = `in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}`;
-  } else if (minutesUntil > 0) {
-    timeUntilText = `in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`;
-  } else {
-    timeUntilText = 'starting soon';
-  }
-  
   embed.setDescription(
-    `📅 <t:${timestamp}:F>\n${timeUntilText}\n\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
+    `📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
   );
 
   // Separate by role and status
