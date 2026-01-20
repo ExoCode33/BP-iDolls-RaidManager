@@ -259,13 +259,13 @@ function getClassEmoji(subclassName) {
 function createRaidButtons(raidId, isLocked) {
   const registerButton = new ButtonBuilder()
     .setCustomId(`register_${raidId}`)
-    .setLabel('Register')
+    .setLabel('Register [Need Clear]')
     .setStyle(ButtonStyle.Success)
     .setDisabled(isLocked);
 
   const assistButton = new ButtonBuilder()
     .setCustomId(`assist_${raidId}`)
-    .setLabel('I can help')
+    .setLabel('Assist [Already Cleared]')
     .setStyle(ButtonStyle.Primary)
     .setDisabled(isLocked);
 
