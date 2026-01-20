@@ -13,12 +13,12 @@ async function createRaidEmbed(raid, registrations) {
   const lockStatus = raid.locked ? 'Registration Closed' : 'Registration Open';
   embed.setTitle(`**${raid.name} • ${lockStatus}** ${lockEmoji}`);
   
-  // ✅ Description with pink ANSI separator lines
+  // ✅ Description with clean separator lines
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   
   embed.setDescription(
-    `\`\`\`ansi\n\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\`\`\`\n📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n👤 Raid Role • <@&${raid.main_role_id}>\n\`\`\`ansi\n\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n\`\`\``
+    `⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
   );
 
   // Separate by role and status
@@ -119,13 +119,6 @@ async function createRaidEmbed(raid, registrations) {
       });
     }
   }
-
-  // ✅ Add pink ANSI separator line at the end
-  embed.addFields({
-    name: '\u200b',
-    value: '```ansi\n\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m\n```',
-    inline: false
-  });
 
   // Add cute footer with iDolls vibe
   embed.setFooter({ text: '✨ iDolls Raid | Show time!' });
