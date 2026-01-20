@@ -72,6 +72,36 @@ const ABILITY_SCORES = [
   { label: '56k+', value: '57000' }
 ];
 
+// ✅ NEW - ANSI embed helper for manual registration (matching registration bot style)
+function createManualRegEmbed(step, total, title, description) {
+  const centerText = (text, width = 42) => text.padStart((text.length + width) / 2).padEnd(width);
+  const titleLine = centerText(title);
+  const descLines = description.split('\n').map(line => centerText(line));
+  
+  const progress = step / total;
+  const filledBars = Math.floor(progress * 10);
+  const emptyBars = 10 - filledBars;
+  const progressBar = '♥'.repeat(filledBars) + '♡'.repeat(emptyBars);
+  const progressText = `${progressBar} ${step}/${total}`;
+  
+  const ansiText = [
+    '\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m',
+    `\u001b[1;34m${titleLine}\u001b[0m`,
+    '\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m',
+    '',
+    ...descLines.map(line => `\u001b[0;37m${line}\u001b[0m`),
+    '',
+    `\u001b[1;35m${centerText(progressText)}\u001b[0m`,
+    '\u001b[35m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m'
+  ].join('\n');
+
+  const { EmbedBuilder } = require('discord.js');
+  return new EmbedBuilder()
+    .setColor('#EC4899')
+    .setDescription(`\`\`\`ansi\n${ansiText}\n\`\`\``)
+    .setTimestamp();
+}
+
 // Helper function to check interaction cooldown
 function checkInteractionCooldown(userId, action) {
   const key = `${userId}_${action}`;
@@ -188,17 +218,23 @@ async function handleButton(interaction) {
   await handleRegistration(interaction, parseInt(raidId), registrationType);
 }
 
-async function showManualClassSelection(interaction) {
-  const parts = interaction.customId.split('_');
-  const raidId = parts[2];
-  const registrationType = parts[3];
+async function showManualClassSelection(interaction, raidId, registrationType) {
+  // ✅ FIX: Can be called from button OR from dropdown
+  if (!raidId) {
+    const parts = interaction.customId.split('_');
+    raidId = parseInt(parts[2]);
+    registrationType = parts[3];
+  }
 
-  await interaction.deferReply({ flags: 64 });
+  // Only defer if not already deferred
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({ flags: 64 });
+  }
 
   try {
     // Store initial state with timestamp
     manualRegState.set(interaction.user.id, {
-      raidId: parseInt(raidId),
+      raidId: raidId,
       registrationType,
       step: 'class',
       timestamp: Date.now()
@@ -239,14 +275,22 @@ async function showManualClassSelection(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // ✅ NEW: Use ANSI embed matching registration bot style
+    const embed = createManualRegEmbed(
+      1, 4,
+      'Manual Registration',
+      'Select your class'
+    );
+
     await interaction.editReply({
-      content: '**Step 1/4:** Select your class',
+      content: '',
+      embeds: [embed],
       components: [row1, row2]
     });
 
   } catch (error) {
     console.error('Show manual class error:', error);
-    await interaction.editReply({ content: '❌ An error occurred!' });
+    await interaction.editReply({ content: '❌ An error occurred!', embeds: [], components: [] });
   }
 }
 
@@ -302,8 +346,16 @@ async function handleManualClassSelect(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // ✅ NEW: Use ANSI embed
+    const embed = createManualRegEmbed(
+      2, 4,
+      'Manual Registration',
+      `Class: ${selectedClass}\n \nSelect your subclass`
+    );
+
     await interaction.editReply({
-      content: `**Step 2/4:** Select your subclass\nClass: **${selectedClass}**`,
+      content: '',
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -350,8 +402,16 @@ async function handleManualSubclassSelect(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // ✅ NEW: Use ANSI embed
+    const embed = createManualRegEmbed(
+      3, 4,
+      'Manual Registration',
+      `Class: ${state.class}\nSubclass: ${selectedSubclass}\n \nSelect your ability score`
+    );
+
     await interaction.editReply({
-      content: `**Step 3/4:** Select your ability score\nClass: **${state.class}** | Subclass: **${selectedSubclass}**`,
+      content: '',
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -506,8 +566,16 @@ async function handleManualBackToClass(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // ✅ NEW: Use ANSI embed
+    const embed = createManualRegEmbed(
+      1, 4,
+      'Manual Registration',
+      'Select your class'
+    );
+
     await interaction.editReply({
-      content: '**Step 1/4:** Select your class',
+      content: '',
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -568,8 +636,16 @@ async function handleManualBackToSubclass(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
+    // ✅ NEW: Use ANSI embed
+    const embed = createManualRegEmbed(
+      2, 4,
+      'Manual Registration',
+      `Class: ${state.class}\n \nSelect your subclass`
+    );
+
     await interaction.editReply({
-      content: `**Step 2/4:** Select your subclass\nClass: **${state.class}**`,
+      content: '',
+      embeds: [embed],
       components: [row1, row2]
     });
 
@@ -688,18 +764,8 @@ async function handleCharacterSelect(interaction) {
     }
 
     if (selection.startsWith('manual_entry_')) {
-      // Start manual registration flow
-      const button = new ButtonBuilder()
-        .setCustomId(`manual_class_${raidId}_${registrationType}`)
-        .setLabel('Start Manual Entry')
-        .setStyle(ButtonStyle.Primary);
-
-      const row = new ActionRowBuilder().addComponents(button);
-
-      await interaction.editReply({
-        content: '**Manual Registration Flow:**\n1️⃣ Select Class\n2️⃣ Select Subclass\n3️⃣ Select Ability Score\n4️⃣ Enter IGN\n\nClick below to begin:',
-        components: [row]
-      });
+      // ✅ FIX: Jump straight to manual class selection with ANSI embed
+      await showManualClassSelection(interaction, parseInt(raidId), registrationType);
       return;
     }
 
