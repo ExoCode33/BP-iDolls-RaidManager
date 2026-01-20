@@ -296,9 +296,17 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       return option;
     });
 
+    // Add "My character is not listed" option at the end
+    classOptions.push({
+      label: 'My character is not listed',
+      value: 'not_listed',
+      description: 'Return to character selection',
+      emoji: '❌'
+    });
+
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`manual_select_class_${interaction.user.id}`)
-      .setPlaceholder('🎭 Select your class')
+      .setPlaceholder('🎭 Pick your class')
       .addOptions(classOptions);
 
     const backButton = new ButtonBuilder()
@@ -341,6 +349,17 @@ async function handleManualClassSelect(interaction) {
     }
 
     const selectedClass = interaction.values[0];
+    
+    // Handle "My character is not listed" option
+    if (selectedClass === 'not_listed') {
+      manualRegState.delete(interaction.user.id);
+      return await interaction.editReply({
+        content: '❌ Manual registration cancelled. Please use the character selection menu to register with an existing character.',
+        embeds: [],
+        components: []
+      });
+    }
+    
     state.class = selectedClass;
     state.step = 'subclass';
     state.timestamp = Date.now(); // Update timestamp
@@ -391,7 +410,7 @@ async function handleManualClassSelect(interaction) {
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`manual_select_subclass_${interaction.user.id}`)
-      .setPlaceholder('✨ Select your subclass')
+      .setPlaceholder('✨ Pick your subclass')
       .addOptions(subclassOptions);
 
     const backButton = new ButtonBuilder()
@@ -442,12 +461,13 @@ async function handleManualSubclassSelect(interaction) {
     const scoreOptions = ABILITY_SCORES.map(score => ({
       label: score.label,
       value: score.value,
+      description: 'Your ability score range',
       emoji: '💪'
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`manual_select_score_${interaction.user.id}`)
-      .setPlaceholder('⚔️ Select your ability score')
+      .setPlaceholder('💪 Pick your score')
       .addOptions(scoreOptions);
 
     const backButton = new ButtonBuilder()
@@ -896,6 +916,7 @@ async function showASSelection(interaction, raid, character, registrationType) {
         ? `✅ ${score.label} (Current)` 
         : score.label,
       value: score.value,
+      description: 'Your ability score range',
       emoji: '💪'
     }));
 
