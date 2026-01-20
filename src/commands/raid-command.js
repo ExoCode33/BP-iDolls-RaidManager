@@ -5,8 +5,7 @@ const {
   createRoleConfigDropdown,
   createPresetDropdown,
   createLockUnlockDropdown,
-  createEmbedDropdown,
-  createRosterDropdown
+  createEmbedAndRosterDropdown
 } = require('../events/raid-handlers/main-menu');
 
 module.exports = {
@@ -23,12 +22,11 @@ module.exports = {
     const roleRow = createRoleConfigDropdown(interaction.user.id);
     const presetRow = createPresetDropdown(interaction.user.id);
     const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-    const embedRow = createEmbedDropdown(interaction.user.id);
-    const rosterRow = createRosterDropdown(interaction.user.id);
+    const managementRow = createEmbedAndRosterDropdown(interaction.user.id);
 
     await interaction.editReply({
       embeds: [embed],
-      components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow, rosterRow]
+      components: [buttonRow, roleRow, presetRow, lockUnlockRow, managementRow]
     });
   }
 };
