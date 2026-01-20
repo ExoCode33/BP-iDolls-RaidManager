@@ -224,6 +224,25 @@ ON CONFLICT (key) DO NOTHING;
       console.log('✅ Lock_notification_message_id column already exists');
     }
 
+    // ✅ NEW - Add reminder_message_id column for tracking reminder messages
+    console.log('🔄 Checking for reminder_message_id column...');
+    const checkReminderMsg = await eventDB.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'raids' AND column_name = 'reminder_message_id'
+    `);
+
+    if (checkReminderMsg.rows.length === 0) {
+      console.log('📝 Adding reminder_message_id column to raids table...');
+      await eventDB.query(`
+        ALTER TABLE raids 
+        ADD COLUMN reminder_message_id VARCHAR(20)
+      `);
+      console.log('✅ Successfully added reminder_message_id column');
+    } else {
+      console.log('✅ Reminder_message_id column already exists');
+    }
+
     // ✅ AUTO-FIX: Update status constraint to allow 'assist'
     console.log('🔄 Checking status constraint...');
     try {
