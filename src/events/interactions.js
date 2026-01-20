@@ -260,7 +260,7 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       timestamp: Date.now()
     });
 
-    // ✅ FIX: Use YOUR server's custom emoji IDs (hardcoded) with validation
+    // ✅ Emoji IDs from server - exact names without spaces
     const emojiMap = {
       'Beat Performer': { name: 'BeatPerformer', id: '1460272597538181254' },
       'Frost Mage': { name: 'FrostMage', id: '1460272596523159695' },
@@ -269,7 +269,7 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
       'Shield Knight': { name: 'ShieldKnight', id: '1460272593306255465' },
       'Stormblade': { name: 'StormBlade', id: '1460272591473348618' },
       'Verdant Oracle': { name: 'VerdantOracle', id: '1460272589296504916' },
-      'Wind Knight': { name: 'WindKnight', id: '1460272588779913428' }
+      'Wind Knight': { name: 'WindKnight', id: '1460272587799138428' }
     };
 
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
@@ -279,18 +279,10 @@ async function showManualClassSelection(interaction, raidId, registrationType) {
         description: data.role
       };
       
-      // Only add emoji if it exists and has valid ID
+      // Add emoji directly - Discord will handle if it doesn't exist
       const emojiObj = emojiMap[className];
-      if (emojiObj && emojiObj.id && emojiObj.id.length > 0) {
-        // Validate the emoji exists in the guild
-        try {
-          const emoji = interaction.guild.emojis.cache.get(emojiObj.id);
-          if (emoji) {
-            option.emoji = emojiObj;
-          }
-        } catch (err) {
-          console.warn(`⚠️ Emoji not found for ${className}: ${emojiObj.id}`);
-        }
+      if (emojiObj) {
+        option.emoji = emojiObj;
       }
       
       return option;
@@ -368,7 +360,7 @@ async function handleManualClassSelect(interaction) {
     const subclasses = CLASSES[selectedClass].subclasses;
     const classRole = CLASSES[selectedClass].role;
     
-    // ✅ FIX: Validate emoji before adding to options
+    // ✅ Emoji IDs from server - exact names without spaces
     const emojiMap = {
       'Beat Performer': { name: 'BeatPerformer', id: '1460272597538181254' },
       'Frost Mage': { name: 'FrostMage', id: '1460272596523159695' },
@@ -377,21 +369,11 @@ async function handleManualClassSelect(interaction) {
       'Shield Knight': { name: 'ShieldKnight', id: '1460272593306255465' },
       'Stormblade': { name: 'StormBlade', id: '1460272591473348618' },
       'Verdant Oracle': { name: 'VerdantOracle', id: '1460272589296504916' },
-      'Wind Knight': { name: 'WindKnight', id: '1460272588779913428' }
+      'Wind Knight': { name: 'WindKnight', id: '1460272587799138428' }
     };
 
-    let emojiObj = undefined;
-    const emojiData = emojiMap[selectedClass];
-    if (emojiData && emojiData.id && emojiData.id.length > 0) {
-      try {
-        const emoji = interaction.guild.emojis.cache.get(emojiData.id);
-        if (emoji) {
-          emojiObj = emojiData;
-        }
-      } catch (err) {
-        console.warn(`⚠️ Emoji not found for ${selectedClass}: ${emojiData.id}`);
-      }
-    }
+    // Get emoji directly - Discord will handle if it doesn't exist
+    const emojiObj = emojiMap[selectedClass];
 
     const subclassOptions = subclasses.map(sub => {
       const option = {
@@ -400,7 +382,7 @@ async function handleManualClassSelect(interaction) {
         description: classRole
       };
       
-      // Only add emoji if validated
+      // Add emoji if available
       if (emojiObj) {
         option.emoji = emojiObj;
       }
@@ -627,7 +609,7 @@ async function handleManualBackToClass(interaction) {
       } else if (className === 'Verdant Oracle') {
         emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
       } else if (className === 'Wind Knight') {
-        emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
+        emojiObj = { name: 'WindKnight', id: '1460272587799138428' };
       }
 
       return {
@@ -707,7 +689,7 @@ async function handleManualBackToSubclass(interaction) {
     } else if (state.class === 'Verdant Oracle') {
       emojiObj = { name: 'VerdantOracle', id: '1460272589296504916' };
     } else if (state.class === 'Wind Knight') {
-      emojiObj = { name: 'WindKnight', id: '1460272588779913428' };
+      emojiObj = { name: 'WindKnight', id: '1460272587799138428' };
     }
 
     const subclassOptions = subclasses.map(sub => ({
