@@ -203,6 +203,21 @@ ON CONFLICT (key) DO NOTHING;
       console.log('✅ Successfully added updated_at column');
     }
 
+    // ✅ AUTO-FIX: Update status constraint to allow 'assist'
+    console.log('🔄 Checking status constraint...');
+    try {
+      await eventDB.query(`
+        ALTER TABLE raid_registrations DROP CONSTRAINT IF EXISTS raid_registrations_status_check;
+      `);
+      await eventDB.query(`
+        ALTER TABLE raid_registrations ADD CONSTRAINT raid_registrations_status_check 
+          CHECK (status IN ('registered', 'waitlist', 'assist'));
+      `);
+      console.log('✅ Status constraint updated to include assist');
+    } catch (constraintError) {
+      console.log('⚠️ Constraint already correct or error:', constraintError.message);
+    }
+
   } catch (error) {
     console.error('❌ Migration failed:', error);
   }
