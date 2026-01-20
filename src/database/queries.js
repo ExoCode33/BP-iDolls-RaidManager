@@ -79,9 +79,7 @@ async function updateRaidStatus(raidId, status) {
   );
 }
 
-// ✅ FIXED - Now validates allowed fields to prevent SQL injection
 async function updateRaid(raidId, data) {
-  // Whitelist of allowed fields to prevent SQL injection
   const ALLOWED_FIELDS = [
     'name', 'raid_size', 'start_time', 'tank_slots', 'support_slots', 
     'dps_slots', 'channel_id', 'main_role_id', 'raid_slot', 'status',
@@ -93,7 +91,6 @@ async function updateRaid(raidId, data) {
   let paramCount = 1;
 
   Object.entries(data).forEach(([key, value]) => {
-    // Validate that the field is allowed
     if (!ALLOWED_FIELDS.includes(key)) {
       console.warn(`Attempted to update non-whitelisted field: ${key}`);
       return;
@@ -203,7 +200,7 @@ async function createRegistration(data) {
   return result.rows[0];
 }
 
-// ✅ NEW - Transaction-safe registration with automatic status determination
+// ✅ FIXED - Transaction-safe registration with auto-demotion that stops when locked
 async function createRegistrationWithTransaction(data) {
   const client = await eventDB.connect();
   
@@ -211,10 +208,15 @@ async function createRegistrationWithTransaction(data) {
     await client.query('BEGIN');
     
     // Lock the raid row to prevent concurrent modifications
-    await client.query(
+    const raidResult = await client.query(
       'SELECT * FROM raids WHERE id = $1 FOR UPDATE',
       [data.raid_id]
     );
+    
+    const raid = raidResult.rows[0];
+    
+    // ✅ NEW: Check if raid is locked - if locked, no auto-demotion allowed
+    const isLocked = raid.locked;
     
     // Check if user is already registered
     const existingCheck = await client.query(
@@ -229,10 +231,10 @@ async function createRegistrationWithTransaction(data) {
     
     // Get current counts with lock
     const countsResult = await client.query(
-      `SELECT role, status, COUNT(*) as count
+      `SELECT role, status, registration_type, COUNT(*) as count
        FROM raid_registrations
        WHERE raid_id = $1
-       GROUP BY role, status`,
+       GROUP BY role, status, registration_type`,
       [data.raid_id]
     );
     
@@ -246,7 +248,7 @@ async function createRegistrationWithTransaction(data) {
     };
     
     countsResult.rows.forEach(row => {
-      counts[row.role][row.status] = parseInt(row.count);
+      counts[row.role][row.status] = (counts[row.role][row.status] || 0) + parseInt(row.count);
       if (row.status === 'registered') {
         counts.total_registered += parseInt(row.count);
       } else if (row.status === 'waitlist') {
@@ -256,21 +258,64 @@ async function createRegistrationWithTransaction(data) {
       }
     });
     
-    // Determine status based on raid capacity
-    const raid = data.raid;
     const role = data.role;
     const registrationType = data.registration_type;
     
     let status;
+    let demotedPlayer = null;
+    
+    // Determine status based on raid capacity
     if (registrationType === 'assist') {
-      status = 'assist';
-    } else {
-      const roleFull = counts[role].registered >= raid[`${role.toLowerCase()}_slots`];
-      const raidFull = counts.total_registered >= raid.raid_size;
+      const roleTotal = counts[role].registered + counts[role].assist;
+      const roleFull = roleTotal >= raid[`${role.toLowerCase()}_slots`];
+      const raidTotal = counts.total_registered + counts.total_assist;
+      const raidFull = raidTotal >= raid.raid_size;
       
       if (roleFull || raidFull) {
         status = 'waitlist';
       } else {
+        status = 'assist';
+      }
+    } else {
+      // registrationType === 'register'
+      const roleTotal = counts[role].registered + counts[role].assist;
+      const roleFull = roleTotal >= raid[`${role.toLowerCase()}_slots`];
+      const raidTotal = counts.total_registered + counts.total_assist;
+      const raidFull = raidTotal >= raid.raid_size;
+      
+      // ✅ NEW: Auto-demotion logic (only if raid is NOT locked)
+      if (!isLocked && (roleFull || raidFull)) {
+        // Role is full - check if there's an assist player to demote
+        const assistToDemote = await client.query(
+          `SELECT * FROM raid_registrations
+           WHERE raid_id = $1 AND role = $2 AND status = 'assist' AND registration_type = 'assist'
+           ORDER BY registered_at DESC
+           LIMIT 1
+           FOR UPDATE`,
+          [data.raid_id, role]
+        );
+        
+        if (assistToDemote.rows.length > 0) {
+          // Demote the most recent assist player to waitlist
+          demotedPlayer = assistToDemote.rows[0];
+          await client.query(
+            'UPDATE raid_registrations SET status = $1 WHERE id = $2',
+            ['waitlist', demotedPlayer.id]
+          );
+          
+          console.log(`🔄 Auto-demoted ${demotedPlayer.ign} (assist) to waitlist to make room for ${data.ign} (register)`);
+          
+          // Now there's a slot available
+          status = 'registered';
+        } else {
+          // No assist to demote, go to waitlist
+          status = 'waitlist';
+        }
+      } else if (roleFull || raidFull) {
+        // Raid is locked OR no assist to demote
+        status = 'waitlist';
+      } else {
+        // There's space
         status = 'registered';
       }
     }
@@ -291,7 +336,8 @@ async function createRegistrationWithTransaction(data) {
     return { 
       success: true, 
       registration: result.rows[0],
-      status: status
+      status: status,
+      demotedPlayer: demotedPlayer // Return demoted player info for notification
     };
     
   } catch (error) {
@@ -365,35 +411,27 @@ async function getRaidCounts(raidId) {
   return counts;
 }
 
-// ✅ FIXED - Now uses FOR UPDATE to prevent race conditions
-async function findNextWaitlistPlayer(raidId, role, preferredType = 'register') {
+// ✅ OPTIMIZED - Single query with priority ordering (register > assist)
+async function findNextWaitlistPlayer(raidId, role) {
   const client = await eventDB.connect();
   
   try {
     await client.query('BEGIN');
     
-    // Try to find player with preferred type first (with lock)
-    let result = await client.query(
+    // Prioritize 'register' over 'assist', then earliest registration (FIFO)
+    const result = await client.query(
       `SELECT * FROM raid_registrations 
-       WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
-       ORDER BY registered_at ASC 
+       WHERE raid_id = $1 AND role = $2 AND status = 'waitlist'
+       ORDER BY 
+         CASE registration_type 
+           WHEN 'register' THEN 1 
+           WHEN 'assist' THEN 2 
+         END ASC,
+         registered_at ASC
        LIMIT 1
        FOR UPDATE SKIP LOCKED`,
-      [raidId, role, preferredType]
+      [raidId, role]
     );
-
-    if (result.rows.length === 0) {
-      // Try other type
-      const otherType = preferredType === 'register' ? 'assist' : 'register';
-      result = await client.query(
-        `SELECT * FROM raid_registrations 
-         WHERE raid_id = $1 AND role = $2 AND status = 'waitlist' AND registration_type = $3
-         ORDER BY registered_at ASC 
-         LIMIT 1
-         FOR UPDATE SKIP LOCKED`,
-        [raidId, role, otherType]
-      );
-    }
     
     await client.query('COMMIT');
     return result.rows[0] || null;
@@ -432,7 +470,6 @@ async function cancelRaid(raidId) {
 async function createRaidPost(raid, channel) {
   const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
   
-  // Fetch existing registrations for this raid
   const registrations = await getRaidRegistrations(raid.id);
   
   const embed = await createRaidEmbed(raid, registrations);
@@ -477,7 +514,7 @@ module.exports = {
   
   // Registrations
   createRegistration,
-  createRegistrationWithTransaction, // ✅ NEW
+  createRegistrationWithTransaction,
   getRegistration,
   deleteRegistration,
   updateRegistrationStatus,
