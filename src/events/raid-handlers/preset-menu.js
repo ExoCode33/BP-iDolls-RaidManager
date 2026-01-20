@@ -121,14 +121,25 @@ async function handlePresetMenu(interaction) {
         break;
       
       case 'back':
-        const { createMainMenuEmbed, createMainMenuRow } = require('./main-menu');
+        const { 
+          createMainMenuEmbed, 
+          createMainMenuButtons,
+          createRosterDropdown,
+          createLockUnlockDropdown,
+          createPresetDropdown,
+          createEmbedAndRoleDropdown
+        } = require('./main-menu');
         await interaction.deferUpdate();
-        const embed = createMainMenuEmbed();
-        const row = createMainMenuRow(interaction.user.id);
+        const embed = await createMainMenuEmbed();
+        const buttonRow = createMainMenuButtons(interaction.user.id);
+        const rosterRow = createRosterDropdown(interaction.user.id);
+        const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
+        const presetRow = createPresetDropdown(interaction.user.id);
+        const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
         await interaction.editReply({
           content: null,
           embeds: [embed],
-          components: [row]
+          components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
         });
         break;
       
