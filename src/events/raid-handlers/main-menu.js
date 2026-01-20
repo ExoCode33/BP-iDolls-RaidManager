@@ -194,6 +194,22 @@ function createEmbedDropdown(userId) {
   return new ActionRowBuilder().addComponents(dropdown);
 }
 
+function createRosterDropdown(userId) {
+  const dropdown = new StringSelectMenuBuilder()
+    .setCustomId(`raid_roster_menu_${userId}`)
+    .setPlaceholder('🛠️ Roster Management')
+    .addOptions([
+      {
+        label: '🛠️ Manage Roster',
+        value: 'manage',
+        description: 'Promote, demote, or remove players',
+        emoji: '🛠️'
+      }
+    ]);
+
+  return new ActionRowBuilder().addComponents(dropdown);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // HANDLERS
 // ═══════════════════════════════════════════════════════════════
@@ -591,12 +607,76 @@ async function handleBackToMain(interaction) {
   const presetRow = createPresetDropdown(interaction.user.id);
   const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
   const embedRow = createEmbedDropdown(interaction.user.id);
+  const rosterRow = createRosterDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: null,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow, rosterRow]
   });
+}
+
+async function handleRosterMenu(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  const action = interaction.values[0];
+
+  if (action === 'manage') {
+    await showRosterRaidSelector(interaction);
+  }
+}
+
+async function showRosterRaidSelector(interaction) {
+  await interaction.deferUpdate();
+
+  try {
+    const raids = await getActiveRaids();
+    const postedRaids = raids.filter(r => r.message_id);
+
+    if (postedRaids.length === 0) {
+      await interaction.followUp({
+        content: `❌ No active raids available!`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    const options = postedRaids.map(raid => ({
+      label: raid.name,
+      value: raid.id.toString(),
+      description: `${raid.raid_size}-player raid`,
+      emoji: raid.locked ? '🔒' : '🔓'
+    }));
+
+    const selectMenu = new StringSelectMenuBuilder()
+      .setCustomId(`raid_roster_select_${interaction.user.id}`)
+      .setPlaceholder('🛠️ Select raid to manage roster')
+      .addOptions(options);
+
+    const backButton = new ButtonBuilder()
+      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+      .setLabel('◀️ Back')
+      .setStyle(ButtonStyle.Secondary);
+
+    const row1 = new ActionRowBuilder().addComponents(selectMenu);
+    const row2 = new ActionRowBuilder().addComponents(backButton);
+
+    const embed = await createMainMenuEmbed();
+
+    await interaction.editReply({
+      content: null,
+      embeds: [embed],
+      components: [row1, row2]
+    });
+
+  } catch (error) {
+    console.error('Show roster raid selector error:', error);
+    await interaction.followUp({
+      content: '❌ An error occurred!',
+      ephemeral: true
+    });
+  }
 }
 
 async function redirectToMainMenu(interaction, errorMessage) {
@@ -621,10 +701,12 @@ module.exports = {
   createPresetDropdown,
   createLockUnlockDropdown,
   createEmbedDropdown,
+  createRosterDropdown,
   handleRoleConfigMenu,
   handlePresetMenu,
   handleLockUnlockMenu,
   handleEmbedMenu,
+  handleRosterMenu,
   handleQuickStart,
   handleQuickComplete,
   handleQuickEdit,
