@@ -265,13 +265,13 @@ function createRaidButtons(raidId, isLocked) {
   const registerButton = new ButtonBuilder()
     .setCustomId(`register_${raidId}`)
     .setLabel('Register [Need Clear]')
-    .setStyle(ButtonStyle.Success)
+    .setStyle(ButtonStyle.Primary)  // ✅ Changed to blue
     .setDisabled(isLocked);
 
   const assistButton = new ButtonBuilder()
     .setCustomId(`assist_${raidId}`)
     .setLabel('Assist [Already Cleared]')
-    .setStyle(ButtonStyle.Primary)
+    .setStyle(ButtonStyle.Secondary)  // ✅ Changed to grey
     .setDisabled(isLocked);
 
   const unregisterButton = new ButtonBuilder()
