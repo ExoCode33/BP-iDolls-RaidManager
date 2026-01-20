@@ -204,22 +204,25 @@ async function showManualClassSelection(interaction) {
       timestamp: Date.now()
     });
 
+    // ✅ FIX: Use simple emojis instead of custom emojis
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
-      let emojiObj = undefined;
+      let emoji = undefined;
       
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
+      // Map class to simple emoji
+      if (className === 'Beat Performer') emoji = '🎵';
+      else if (className === 'Frost Mage') emoji = '❄️';
+      else if (className === 'Heavy Guardian') emoji = '🛡️';
+      else if (className === 'Marksman') emoji = '🏹';
+      else if (className === 'Shield Knight') emoji = '⚔️';
+      else if (className === 'Stormblade') emoji = '⚡';
+      else if (className === 'Verdant Oracle') emoji = '🌿';
+      else if (className === 'Wind Knight') emoji = '💨';
 
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+        emoji: emoji
       };
     });
 
@@ -267,21 +270,23 @@ async function handleManualClassSelect(interaction) {
 
     const subclasses = CLASSES[selectedClass].subclasses;
     const classRole = CLASSES[selectedClass].role;
-    const classEmoji = getClassEmoji(selectedClass);
     
-    let emojiObj = undefined;
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
+    // ✅ FIX: Use simple emojis based on class
+    let emoji = undefined;
+    if (selectedClass === 'Beat Performer') emoji = '🎵';
+    else if (selectedClass === 'Frost Mage') emoji = '❄️';
+    else if (selectedClass === 'Heavy Guardian') emoji = '🛡️';
+    else if (selectedClass === 'Marksman') emoji = '🏹';
+    else if (selectedClass === 'Shield Knight') emoji = '⚔️';
+    else if (selectedClass === 'Stormblade') emoji = '⚡';
+    else if (selectedClass === 'Verdant Oracle') emoji = '🌿';
+    else if (selectedClass === 'Wind Knight') emoji = '💨';
 
     const subclassOptions = subclasses.map(sub => ({
       label: sub,
       value: sub,
       description: classRole,
-      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+      emoji: emoji
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
@@ -467,22 +472,24 @@ async function handleManualBackToClass(interaction) {
     state.timestamp = Date.now();
     manualRegState.set(interaction.user.id, state);
 
+    // ✅ FIX: Use simple emojis
     const classOptions = Object.entries(CLASSES).map(([className, data]) => {
-      const emoji = getClassEmoji(className);
-      let emojiObj = undefined;
+      let emoji = undefined;
       
-      if (emoji) {
-        const match = emoji.match(/<:(\w+):(\d+)>/);
-        if (match) {
-          emojiObj = { name: match[1], id: match[2] };
-        }
-      }
+      if (className === 'Beat Performer') emoji = '🎵';
+      else if (className === 'Frost Mage') emoji = '❄️';
+      else if (className === 'Heavy Guardian') emoji = '🛡️';
+      else if (className === 'Marksman') emoji = '🏹';
+      else if (className === 'Shield Knight') emoji = '⚔️';
+      else if (className === 'Stormblade') emoji = '⚡';
+      else if (className === 'Verdant Oracle') emoji = '🌿';
+      else if (className === 'Wind Knight') emoji = '💨';
 
       return {
         label: className,
         value: className,
         description: data.role,
-        emoji: emojiObj || (data.role === 'Tank' ? '🛡️' : data.role === 'Support' ? '💚' : '⚔️')
+        emoji: emoji
       };
     });
 
@@ -529,21 +536,23 @@ async function handleManualBackToSubclass(interaction) {
 
     const subclasses = CLASSES[state.class].subclasses;
     const classRole = CLASSES[state.class].role;
-    const classEmoji = getClassEmoji(state.class);
     
-    let emojiObj = undefined;
-    if (classEmoji) {
-      const match = classEmoji.match(/<:(\w+):(\d+)>/);
-      if (match) {
-        emojiObj = { name: match[1], id: match[2] };
-      }
-    }
+    // ✅ FIX: Use simple emojis
+    let emoji = undefined;
+    if (state.class === 'Beat Performer') emoji = '🎵';
+    else if (state.class === 'Frost Mage') emoji = '❄️';
+    else if (state.class === 'Heavy Guardian') emoji = '🛡️';
+    else if (state.class === 'Marksman') emoji = '🏹';
+    else if (state.class === 'Shield Knight') emoji = '⚔️';
+    else if (state.class === 'Stormblade') emoji = '⚡';
+    else if (state.class === 'Verdant Oracle') emoji = '🌿';
+    else if (state.class === 'Wind Knight') emoji = '💨';
 
     const subclassOptions = subclasses.map(sub => ({
       label: sub,
       value: sub,
       description: classRole,
-      emoji: emojiObj || (classRole === 'Tank' ? '🛡️' : classRole === 'Support' ? '💚' : '⚔️')
+      emoji: emoji
     }));
 
     const selectMenu = new StringSelectMenuBuilder()
