@@ -6,30 +6,45 @@ const { setConfig } = require('../../database/queries');
 // ═══════════════════════════════════════════════════════════════
 
 async function showSetupModal(interaction) {
-  const modal = new ModalBuilder()
-    .setCustomId(`raid_setup_modal_${interaction.user.id}`)
-    .setTitle('⚙️ Setup Raid Roles');
+  try {
+    console.log(`[SETUP] Showing setup modal for user ${interaction.user.id}`);
+    console.log(`[SETUP] Interaction state: deferred=${interaction.deferred}, replied=${interaction.replied}`);
+    
+    const modal = new ModalBuilder()
+      .setCustomId(`raid_setup_modal_${interaction.user.id}`)
+      .setTitle('⚙️ Setup Raid Roles');
 
-  const raid1Input = new TextInputBuilder()
-    .setCustomId('raid1_role_id')
-    .setLabel('Raid 1 Role ID')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Right-click role → Copy ID')
-    .setRequired(true);
+    const raid1Input = new TextInputBuilder()
+      .setCustomId('raid1_role_id')
+      .setLabel('Raid 1 Role ID')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Right-click role → Copy ID')
+      .setRequired(true);
 
-  const raid2Input = new TextInputBuilder()
-    .setCustomId('raid2_role_id')
-    .setLabel('Raid 2 Role ID')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('Right-click role → Copy ID')
-    .setRequired(true);
+    const raid2Input = new TextInputBuilder()
+      .setCustomId('raid2_role_id')
+      .setLabel('Raid 2 Role ID')
+      .setStyle(TextInputStyle.Short)
+      .setPlaceholder('Right-click role → Copy ID')
+      .setRequired(true);
 
-  modal.addComponents(
-    new ActionRowBuilder().addComponents(raid1Input),
-    new ActionRowBuilder().addComponents(raid2Input)
-  );
+    modal.addComponents(
+      new ActionRowBuilder().addComponents(raid1Input),
+      new ActionRowBuilder().addComponents(raid2Input)
+    );
 
-  await interaction.showModal(modal);
+    await interaction.showModal(modal);
+    console.log(`[SETUP] Modal shown successfully`);
+  } catch (error) {
+    console.error('[SETUP] Error showing modal:', error);
+    console.error('[SETUP] Error details:', {
+      code: error.code,
+      message: error.message,
+      deferred: interaction.deferred,
+      replied: interaction.replied
+    });
+    throw error;
+  }
 }
 
 async function handleSetupModal(interaction) {
