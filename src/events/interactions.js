@@ -192,6 +192,14 @@ setInterval(cleanupExpiredState, 60000);
 async function handleButton(interaction) {
   const [action, raidId] = interaction.customId.split('_');
 
+  // ✅ FIX: Only handle register/assist/unregister buttons
+  // Let other buttons (like raid_management_menu) be handled by their own handlers
+  const validActions = ['register', 'assist', 'unregister', 'manual', 'admin'];
+  if (!validActions.includes(action)) {
+    // Not a button this handler should process
+    return;
+  }
+
   // Check for spam
   if (!checkInteractionCooldown(interaction.user.id, `button_${action}_${raidId}`)) {
     return await interaction.reply({ 
@@ -214,7 +222,7 @@ async function handleButton(interaction) {
     const parsedRaidId = parseInt(raidId);
     if (isNaN(parsedRaidId)) {
       console.error(`Invalid raid ID for unregister: ${raidId} from customId: ${interaction.customId}`);
-      return await interaction.reply({ content: '❌ Invalid raid ID!', ephemeral: true });
+      return await interaction.reply({ content: '❌ Invalid raid ID!', flags: 64 });
     }
     return await handleUnregister(interaction, parsedRaidId);
   }
@@ -223,7 +231,7 @@ async function handleButton(interaction) {
   const parsedRaidId = parseInt(raidId);
   if (isNaN(parsedRaidId)) {
     console.error(`Invalid raid ID for registration: ${raidId} from customId: ${interaction.customId}`);
-    return await interaction.reply({ content: '❌ Invalid raid ID!', ephemeral: true });
+    return await interaction.reply({ content: '❌ Invalid raid ID!', flags: 64 });
   }
 
   const registrationType = action === 'assist' ? 'assist' : 'register';
