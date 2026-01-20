@@ -18,7 +18,7 @@ async function createRaidEmbed(raid, registrations) {
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
   
   embed.setDescription(
-    `⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
+    `⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯\n📅 <t:${timestamp}:F>\n⏰ <t:${timestamp}:R>\n👤 Raid Role • <@&${raid.main_role_id}>\n⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯`
   );
 
   // Separate by role and status
@@ -265,13 +265,13 @@ function createRaidButtons(raidId, isLocked) {
   const registerButton = new ButtonBuilder()
     .setCustomId(`register_${raidId}`)
     .setLabel('Register [Need Clear]')
-    .setStyle(ButtonStyle.Primary)  // ✅ Changed to blue
+    .setStyle(ButtonStyle.Primary)  // Blue
     .setDisabled(isLocked);
 
   const assistButton = new ButtonBuilder()
     .setCustomId(`assist_${raidId}`)
     .setLabel('Assist [Already Cleared]')
-    .setStyle(ButtonStyle.Secondary)  // ✅ Changed to grey
+    .setStyle(ButtonStyle.Primary)  // ✅ Changed back to blue
     .setDisabled(isLocked);
 
   const unregisterButton = new ButtonBuilder()
