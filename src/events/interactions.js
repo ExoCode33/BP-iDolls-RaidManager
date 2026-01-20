@@ -702,14 +702,25 @@ async function processRegistration(interaction, raid, character, registrationTyp
       throw new Error(result.error || 'Registration failed');
     }
 
-    const { status } = result;
+    const { status, demotedPlayer } = result;
 
-    if (status === 'registered') {
+    // ✅ Add Discord role if registered OR assist (not waitlist)
+    if (status === 'registered' || status === 'assist') {
       try {
         const member = await interaction.guild.members.fetch(interaction.user.id);
         await member.roles.add(raid.main_role_id);
       } catch (err) {
         console.error('Failed to add role:', err);
+      }
+    }
+
+    // ✅ NEW: Remove role from demoted player (silent - no notification)
+    if (demotedPlayer) {
+      try {
+        const demotedMember = await interaction.guild.members.fetch(demotedPlayer.user_id);
+        await demotedMember.roles.remove(raid.main_role_id);
+      } catch (err) {
+        console.error('Failed to remove role from demoted player:', err);
       }
     }
 
@@ -762,7 +773,8 @@ async function handleUnregister(interaction, raidId) {
       return await interaction.editReply({ content: '❌ You are not registered for this raid!' });
     }
 
-    const wasRegistered = registration.status === 'registered';
+    // ✅ FIX: Promote from waitlist if unregistering player had registered OR assist status (not waitlist)
+    const wasInRaid = registration.status === 'registered' || registration.status === 'assist';
     const userRole = registration.role;
 
     await deleteRegistration(raidId, interaction.user.id);
@@ -774,7 +786,8 @@ async function handleUnregister(interaction, raidId) {
       console.error('Failed to remove role:', err);
     }
 
-    if (wasRegistered) {
+    // Only promote from waitlist if the person leaving was actually in the raid (not already on waitlist)
+    if (wasInRaid) {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
       await promoteFromWaitlist(raid, userRole, channel);
     }
@@ -796,7 +809,10 @@ async function promoteFromWaitlist(raid, role, channel) {
 
     if (!nextPlayer) return;
 
-    await updateRegistrationStatus(nextPlayer.id, 'registered');
+    // ✅ FIX: Preserve the original registration_type (assist or register)
+    // When promoting, they keep their original type, just change status from 'waitlist' to their type
+    const newStatus = nextPlayer.registration_type; // 'assist' or 'register'
+    await updateRegistrationStatus(nextPlayer.id, newStatus);
 
     const guild = channel.guild;
     try {
