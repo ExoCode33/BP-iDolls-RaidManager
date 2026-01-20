@@ -6,14 +6,29 @@ const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('
 
 async function createRaidEmbed(raid, registrations) {
   const embed = new EmbedBuilder()
-    .setColor(0xEC4899)
-    .setTitle(`✨ ${raid.name} ✨`); // Cute title with sparkles
+    .setColor(0xEC4899);
   
-  // Cute description without separator line
+  // ✅ NEW: Title without emoji, with lock status
+  const lockStatus = raid.locked ? 'Registration Closed' : 'Registration Open';
+  embed.setTitle(`${raid.name} • ${lockStatus}`);
+  
+  // ✅ NEW: Description with date, time until raid, and raid role
   const timestamp = Math.floor(new Date(raid.start_time).getTime() / 1000);
   const raidNumber = raid.raid_size === 12 ? '1' : '2';
+  
+  // Calculate time until raid
+  const now = Date.now();
+  const raidTime = new Date(raid.start_time).getTime();
+  const timeUntil = raidTime - now;
+  const hoursUntil = Math.floor(timeUntil / (1000 * 60 * 60));
+  const timeUntilText = hoursUntil > 0 
+    ? `in ${hoursUntil} hour${hoursUntil !== 1 ? 's' : ''}` 
+    : timeUntil > 0 
+      ? 'in less than 1 hour'
+      : 'started';
+  
   embed.setDescription(
-    `📅 <t:${timestamp}:F>\n🎮 Raid ${raidNumber}`
+    `<t:${timestamp}:F>\n${timeUntilText}\n\n👤 Raid Role • <@&${raid.main_role_id}>`
   );
 
   // Separate by role and status
