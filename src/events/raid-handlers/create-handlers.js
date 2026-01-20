@@ -77,10 +77,26 @@ async function handleDateModal(interaction) {
   try {
     const date = interaction.fields.getTextInputValue('date');
     
-    // Validate date format
+    // ✅ FIX: Improved date validation
+    // Check format first
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Invalid date format! Use YYYY-MM-DD. Redirecting to main menu...');
+      return await redirectToMainMenu(interaction, '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-12-31)');
+    }
+    
+    // ✅ FIX: Validate actual date
+    const dateObj = new Date(date + 'T00:00:00');
+    if (isNaN(dateObj.getTime())) {
+      raidCreationState.delete(interaction.user.id);
+      return await redirectToMainMenu(interaction, '❌ Invalid date! Please enter a valid date.');
+    }
+    
+    // ✅ FIX: Prevent dates in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (dateObj < today) {
+      raidCreationState.delete(interaction.user.id);
+      return await redirectToMainMenu(interaction, '❌ Date must be today or in the future!');
     }
     
     const state = raidCreationState.get(interaction.user.id) || {};
