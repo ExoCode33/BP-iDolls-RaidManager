@@ -211,11 +211,23 @@ async function handleButton(interaction) {
   }
 
   if (action === 'unregister') {
-    return await handleUnregister(interaction, parseInt(raidId));
+    const parsedRaidId = parseInt(raidId);
+    if (isNaN(parsedRaidId)) {
+      console.error(`Invalid raid ID for unregister: ${raidId} from customId: ${interaction.customId}`);
+      return await interaction.reply({ content: '❌ Invalid raid ID!', ephemeral: true });
+    }
+    return await handleUnregister(interaction, parsedRaidId);
+  }
+
+  // ✅ FIX: Validate raid ID before calling handleRegistration
+  const parsedRaidId = parseInt(raidId);
+  if (isNaN(parsedRaidId)) {
+    console.error(`Invalid raid ID for registration: ${raidId} from customId: ${interaction.customId}`);
+    return await interaction.reply({ content: '❌ Invalid raid ID!', ephemeral: true });
   }
 
   const registrationType = action === 'assist' ? 'assist' : 'register';
-  await handleRegistration(interaction, parseInt(raidId), registrationType);
+  await handleRegistration(interaction, parsedRaidId, registrationType);
 }
 
 async function showManualClassSelection(interaction, raidId, registrationType) {
