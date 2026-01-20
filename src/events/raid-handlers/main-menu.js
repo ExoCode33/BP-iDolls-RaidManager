@@ -172,10 +172,10 @@ function createLockUnlockDropdown(userId) {
   return new ActionRowBuilder().addComponents(dropdown);
 }
 
-function createEmbedDropdown(userId) {
+function createEmbedAndRosterDropdown(userId) {
   const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_embed_menu_${userId}`)
-    .setPlaceholder('📺 Embed Management')
+    .setCustomId(`raid_management_menu_${userId}`)
+    .setPlaceholder('📺 Embed & Roster Management')
     .addOptions([
       {
         label: '🔄 Refresh Embed',
@@ -188,20 +188,10 @@ function createEmbedDropdown(userId) {
         value: 'repost',
         description: 'Restore deleted embed',
         emoji: '📝'
-      }
-    ]);
-
-  return new ActionRowBuilder().addComponents(dropdown);
-}
-
-function createRosterDropdown(userId) {
-  const dropdown = new StringSelectMenuBuilder()
-    .setCustomId(`raid_roster_menu_${userId}`)
-    .setPlaceholder('🛠️ Roster Management')
-    .addOptions([
+      },
       {
         label: '🛠️ Manage Roster',
-        value: 'manage',
+        value: 'roster',
         description: 'Promote, demote, or remove players',
         emoji: '🛠️'
       }
@@ -274,7 +264,7 @@ async function handleLockUnlockMenu(interaction) {
   }
 }
 
-async function handleEmbedMenu(interaction) {
+async function handleManagementMenu(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
@@ -289,9 +279,13 @@ async function handleEmbedMenu(interaction) {
       case 'repost':
         await showRaidSelector(interaction, 'repost', '📝 Repost Embed');
         break;
+      
+      case 'roster':
+        await showRosterRaidSelector(interaction);
+        break;
     }
   } catch (error) {
-    console.error('Embed menu error:', error);
+    console.error('Management menu error:', error);
     await redirectToMainMenu(interaction, '❌ An error occurred!');
   }
 }
@@ -606,25 +600,13 @@ async function handleBackToMain(interaction) {
   const roleRow = createRoleConfigDropdown(interaction.user.id);
   const presetRow = createPresetDropdown(interaction.user.id);
   const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const embedRow = createEmbedDropdown(interaction.user.id);
-  const rosterRow = createRosterDropdown(interaction.user.id);
+  const managementRow = createEmbedAndRosterDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: null,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow, rosterRow]
+    components: [buttonRow, roleRow, presetRow, lockUnlockRow, managementRow]
   });
-}
-
-async function handleRosterMenu(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  const action = interaction.values[0];
-
-  if (action === 'manage') {
-    await showRosterRaidSelector(interaction);
-  }
 }
 
 async function showRosterRaidSelector(interaction) {
@@ -700,13 +682,11 @@ module.exports = {
   createRoleConfigDropdown,
   createPresetDropdown,
   createLockUnlockDropdown,
-  createEmbedDropdown,
-  createRosterDropdown,
+  createEmbedAndRosterDropdown,
   handleRoleConfigMenu,
   handlePresetMenu,
   handleLockUnlockMenu,
-  handleEmbedMenu,
-  handleRosterMenu,
+  handleManagementMenu,
   handleQuickStart,
   handleQuickComplete,
   handleQuickEdit,
