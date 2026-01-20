@@ -265,29 +265,74 @@ async function handleLockUnlockMenu(interaction) {
 }
 
 async function handleManagementMenu(interaction) {
+  console.log(`[MGMT] handleManagementMenu called`);
+  console.log(`[MGMT] customId: ${interaction.customId}`);
+  console.log(`[MGMT] values: ${JSON.stringify(interaction.values)}`);
+  
   const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
+  console.log(`[MGMT] Extracted userId: ${userId}, actual user: ${interaction.user.id}`);
+  
+  if (userId !== interaction.user.id) {
+    console.log(`[MGMT] User mismatch, returning`);
+    return;
+  }
 
   const action = interaction.values[0];
+  console.log(`[MGMT] Action selected: ${action}`);
 
   try {
     switch (action) {
       case 'setup':
+        console.log(`[MGMT] Calling showSetupModal`);
+        // Don't defer - modals must be immediate response
         const setupHandlers = require('./setup-handlers');
         await setupHandlers.showSetupModal(interaction);
         break;
         
       case 'refresh':
+        console.log(`[MGMT] Calling showRaidSelector for refresh`);
         await showRaidSelector(interaction, 'refresh', '🔄 Refresh Embed');
         break;
       
       case 'repost':
+        console.log(`[MGMT] Calling showRaidSelector for repost`);
         await showRaidSelector(interaction, 'repost', '📝 Repost Embed');
         break;
+      
+      default:
+        console.warn(`[MGMT] Unknown management menu action: ${action}`);
+        await interaction.reply({ 
+          content: '❌ Unknown action!', 
+          ephemeral: true 
+        });
     }
   } catch (error) {
-    console.error('Management menu error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred!');
+    console.error('[MGMT] Management menu error:', error);
+    console.error('[MGMT] Error details:', {
+      action,
+      userId,
+      deferred: interaction.deferred,
+      replied: interaction.replied,
+      customId: interaction.customId,
+      stack: error.stack
+    });
+    
+    // Only try to respond if we haven't already
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred while processing your request.',
+        ephemeral: true
+      });
+    } else if (interaction.deferred) {
+      await interaction.editReply({
+        content: '❌ An error occurred while processing your request.'
+      });
+    } else {
+      await interaction.followUp({
+        content: '❌ An error occurred while processing your request.',
+        ephemeral: true
+      });
+    }
   }
 }
 
