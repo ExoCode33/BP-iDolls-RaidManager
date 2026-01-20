@@ -75,6 +75,40 @@ async function handleStartSelect(interaction) {
       return await redirectToMainMenu(interaction, '❌ This raid has already been posted!');
     }
 
+    // ✅ CLEANUP: Remove raid role from all members before posting
+    try {
+      const guild = interaction.guild;
+      const role = await guild.roles.fetch(raid.main_role_id);
+      
+      if (role) {
+        console.log(`🧹 Cleaning up role: ${role.name} (${role.id})`);
+        
+        // Fetch all members with this role
+        const membersWithRole = role.members;
+        
+        if (membersWithRole.size > 0) {
+          console.log(`   Removing role from ${membersWithRole.size} member(s)...`);
+          
+          // Remove role from each member
+          for (const [memberId, member] of membersWithRole) {
+            try {
+              await member.roles.remove(raid.main_role_id);
+              console.log(`   ✅ Removed from ${member.user.tag}`);
+            } catch (removeErr) {
+              console.error(`   ❌ Failed to remove from ${member.user.tag}:`, removeErr.message);
+            }
+          }
+          
+          console.log(`✅ Role cleanup complete!`);
+        } else {
+          console.log(`   No members have this role - skipping cleanup`);
+        }
+      }
+    } catch (cleanupErr) {
+      console.error('⚠️ Role cleanup failed (non-critical):', cleanupErr.message);
+      // Continue with posting even if cleanup fails
+    }
+
     // Post the raid
     const channel = await interaction.client.channels.fetch(raid.channel_id);
     const messageId = await createRaidPost(raid, channel);
@@ -104,23 +138,23 @@ async function redirectToMainMenu(interaction, errorMessage) {
   const { 
     createMainMenuEmbed, 
     createMainMenuButtons,
-    createRoleConfigDropdown,
-    createPresetDropdown,
+    createRosterDropdown,
     createLockUnlockDropdown,
-    createEmbedDropdown
+    createPresetDropdown,
+    createEmbedAndRoleDropdown
   } = require('./main-menu');
   
   const embed = await createMainMenuEmbed();
   const buttonRow = createMainMenuButtons(interaction.user.id);
-  const roleRow = createRoleConfigDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
+  const rosterRow = createRosterDropdown(interaction.user.id);
   const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const embedRow = createEmbedDropdown(interaction.user.id);
+  const presetRow = createPresetDropdown(interaction.user.id);
+  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
 
   await interaction.editReply({
     content: errorMessage,
     embeds: [embed],
-    components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+    components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
   });
 
   // Auto-remove error message after 3 seconds
@@ -129,7 +163,7 @@ async function redirectToMainMenu(interaction, errorMessage) {
       await interaction.editReply({
         content: null,
         embeds: [embed],
-        components: [buttonRow, roleRow, presetRow, lockUnlockRow, embedRow]
+        components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
       });
     } catch (err) {
       // Ignore if interaction expired
