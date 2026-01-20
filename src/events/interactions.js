@@ -24,47 +24,55 @@ const MANUAL_REG_TTL = 5 * 60 * 1000; // 5 minutes
 const activeInteractions = new Map();
 const INTERACTION_COOLDOWN = 2000; // 2 seconds
 
-// ✅ CORRECT SUBCLASSES from your game config
+// ✅ CORRECT SUBCLASSES FROM GAME CONFIG
 const CLASSES = {
   'Beat Performer': { 
+    subclasses: ['Dissonance', 'Concerto'], 
     role: 'Support', 
-    subclasses: ['Panacea', 'Chroma'],
-    iconId: '1448837920931840021'
+    emoji: '🎵', 
+    iconId: '1448837920931840021' 
   },
   'Frost Mage': { 
+    subclasses: ['Icicle', 'Frostbeam'], 
     role: 'DPS', 
-    subclasses: ['Hail', 'Frostfire'],
-    iconId: '1448837917144387604'
+    emoji: '❄️', 
+    iconId: '1448837917144387604' 
   },
   'Heavy Guardian': { 
+    subclasses: ['Earthfort', 'Block'], 
     role: 'Tank', 
-    subclasses: ['Fortress', 'Vanguard'],
-    iconId: '1448837916171309147'
+    emoji: '🛡️', 
+    iconId: '1448837916171309147' 
   },
   'Marksman': { 
+    subclasses: ['Wildpack', 'Falconry'], 
     role: 'DPS', 
-    subclasses: ['Precision', 'Blitz'],
-    iconId: '1448837914338267350'
+    emoji: '🏹', 
+    iconId: '1448837914338267350' 
   },
   'Shield Knight': { 
+    subclasses: ['Recovery', 'Shield'], 
     role: 'Tank', 
-    subclasses: ['Recovery', 'Sentinel'],
-    iconId: '1448837913218388000'
+    emoji: '⚔️', 
+    iconId: '1448837913218388000' 
   },
-  'Storm Blade': { 
+  'Stormblade': { 
+    subclasses: ['Iaido Slash', 'Moonstrike'], 
     role: 'DPS', 
-    subclasses: ['Iaido', 'Flow'],
-    iconId: '1448837911838593188'
+    emoji: '⚡', 
+    iconId: '1448837911838593188' 
   },
   'Verdant Oracle': { 
+    subclasses: ['Smite', 'Lifebind'], 
     role: 'Support', 
-    subclasses: ['Lifebind', 'Nature'],
-    iconId: '1448837910294958140'
+    emoji: '🌿', 
+    iconId: '1448837910294958140' 
   },
   'Wind Knight': { 
+    subclasses: ['Vanguard', 'Skyward'], 
     role: 'DPS', 
-    subclasses: ['Tempest', 'Gale'],
-    iconId: '1448837908302925874'
+    emoji: '💨', 
+    iconId: '1448837908302925874' 
   }
 };
 
