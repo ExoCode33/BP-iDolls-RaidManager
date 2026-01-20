@@ -5,7 +5,7 @@
 
 const { 
   handleBackToMain,
-  handleRoleConfigMenu,
+  handleRosterMenu,
   handlePresetMenu,
   handleLockUnlockMenu,
   handleManagementMenu,
@@ -31,7 +31,7 @@ const { handleEditSelect, handleDeleteSelect, handleDeleteConfirm } = require('.
 module.exports = {
   // Main menu handlers (NEW)
   handleBackToMain,
-  handleRoleConfigMenu,
+  handleRosterMenu,
   handlePresetMenu,
   handleLockUnlockMenu,
   handleManagementMenu,
