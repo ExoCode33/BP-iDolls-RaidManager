@@ -572,23 +572,19 @@ async function handleRegistration(interaction, raidId, registrationType) {
         }
       }
 
+      // ✅ FIX: Convert AS to range label
+      const asRange = ABILITY_SCORES.find(s => parseInt(s.value) === char.ability_score);
+      const asDisplay = asRange ? asRange.label : char.ability_score;
+
       options.push({
         label: char.ign,
         value: `char_${char.id}`,
-        description: `${char.subclass} • ${char.ability_score}`,
+        description: `${char.subclass} • ${asDisplay}`,
         emoji: emojiObj
       });
     }
 
-    if (options.length > 0) {
-      options.push({
-        label: '────────────────────────',
-        value: 'separator',
-        description: 'My character is not listed',
-        disabled: true
-      });
-    }
-
+    // ✅ FIX: Removed separator - just add manual entry option directly
     options.push({
       label: 'My Character is not listed',
       value: `manual_entry_${registrationType}`,
