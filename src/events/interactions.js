@@ -24,16 +24,48 @@ const MANUAL_REG_TTL = 5 * 60 * 1000; // 5 minutes
 const activeInteractions = new Map();
 const INTERACTION_COOLDOWN = 2000; // 2 seconds
 
-// Class definitions
+// ✅ CORRECT SUBCLASSES from your game config
 const CLASSES = {
-  'Beat Performer': { role: 'Support', subclasses: ['Panacea', 'Chroma'], iconId: '1448837920931840021' },
-  'Frost Mage': { role: 'DPS', subclasses: ['Hail', 'Frostfire'], iconId: '1448837917144387604' },
-  'Heavy Guardian': { role: 'Tank', subclasses: ['Fortress', 'Vanguard'], iconId: '1448837916171309147' },
-  'Marksman': { role: 'DPS', subclasses: ['Precision', 'Blitz'], iconId: '1448837914338267350' },
-  'Shield Knight': { role: 'Tank', subclasses: ['Recovery', 'Sentinel'], iconId: '1448837913218388000' },
-  'Storm Blade': { role: 'DPS', subclasses: ['Iaido', 'Flow'], iconId: '1448837911838593188' },
-  'Verdant Oracle': { role: 'Support', subclasses: ['Lifebind', 'Nature'], iconId: '1448837910294958140' },
-  'Wind Knight': { role: 'DPS', subclasses: ['Tempest', 'Gale'], iconId: '1448837908302925874' }
+  'Beat Performer': { 
+    role: 'Support', 
+    subclasses: ['Panacea', 'Chroma'],
+    iconId: '1448837920931840021'
+  },
+  'Frost Mage': { 
+    role: 'DPS', 
+    subclasses: ['Hail', 'Frostfire'],
+    iconId: '1448837917144387604'
+  },
+  'Heavy Guardian': { 
+    role: 'Tank', 
+    subclasses: ['Fortress', 'Vanguard'],
+    iconId: '1448837916171309147'
+  },
+  'Marksman': { 
+    role: 'DPS', 
+    subclasses: ['Precision', 'Blitz'],
+    iconId: '1448837914338267350'
+  },
+  'Shield Knight': { 
+    role: 'Tank', 
+    subclasses: ['Recovery', 'Sentinel'],
+    iconId: '1448837913218388000'
+  },
+  'Storm Blade': { 
+    role: 'DPS', 
+    subclasses: ['Iaido', 'Flow'],
+    iconId: '1448837911838593188'
+  },
+  'Verdant Oracle': { 
+    role: 'Support', 
+    subclasses: ['Lifebind', 'Nature'],
+    iconId: '1448837910294958140'
+  },
+  'Wind Knight': { 
+    role: 'DPS', 
+    subclasses: ['Tempest', 'Gale'],
+    iconId: '1448837908302925874'
+  }
 };
 
 const ABILITY_SCORES = [
@@ -262,7 +294,7 @@ async function handleCharacterSelect(interaction) {
         timestamp: Date.now()
       });
 
-      // Show step 1: Class selection
+      // ✅ FIX: Use editReply to replace the old message completely
       const embed = createManualRegEmbed(1, 4, '🎭 Which class speaks to you?', 'Choose your class');
 
       const classOptions = Object.entries(CLASSES).map(([name, data]) => ({
@@ -285,6 +317,7 @@ async function handleCharacterSelect(interaction) {
       const row1 = new ActionRowBuilder().addComponents(selectMenu);
       const row2 = new ActionRowBuilder().addComponents(backButton);
 
+      // ✅ Replace the previous message completely
       await interaction.editReply({
         content: null,
         embeds: [embed],
@@ -362,6 +395,7 @@ async function handleManualClassSelect(interaction) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
+      content: null,
       embeds: [embed],
       components: [row1, row2]
     });
@@ -413,6 +447,7 @@ async function handleManualSubclassSelect(interaction) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
+      content: null,
       embeds: [embed],
       components: [row1, row2]
     });
@@ -461,8 +496,6 @@ async function handleManualScoreSelect(interaction) {
     console.error('Manual score select error:', error);
     if (!interaction.replied && !interaction.deferred) {
       await interaction.reply({ content: '❌ An error occurred!', flags: 64 });
-    } else {
-      await interaction.followUp({ content: '❌ An error occurred!', flags: 64 });
     }
   }
 }
@@ -556,6 +589,7 @@ async function handleManualBackToClass(interaction) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
+      content: null,
       embeds: [embed],
       components: [row1, row2]
     });
@@ -609,6 +643,7 @@ async function handleManualBackToSubclass(interaction) {
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
+      content: null,
       embeds: [embed],
       components: [row1, row2]
     });
@@ -642,9 +677,19 @@ async function processRegistration(interaction, raid, character, registrationTyp
 
     if (!result.success) {
       if (result.error === 'ALREADY_REGISTERED') {
-        return await interaction.editReply({ 
-          content: '❌ You are already registered for this raid!' 
-        });
+        // ✅ FIX: Use editReply instead of followUp to avoid ephemeral spam
+        if (interaction.deferred) {
+          return await interaction.editReply({ 
+            content: '❌ You are already registered for this raid!',
+            embeds: [],
+            components: []
+          });
+        } else {
+          return await interaction.followUp({ 
+            content: '❌ You are already registered for this raid!',
+            flags: 64
+          });
+        }
       }
       throw new Error(result.error || 'Registration failed');
     }
@@ -666,10 +711,15 @@ async function processRegistration(interaction, raid, character, registrationTyp
     if (status === 'waitlist') message = '✅ Added to waitlist!';
     if (status === 'assist') message = '✅ Marked as assist!';
 
+    // ✅ FIX: Always use editReply to replace the embed, never followUp
     if (interaction.deferred) {
-      await interaction.followUp({ content: message, flags: 64 });
+      await interaction.editReply({ 
+        content: message,
+        embeds: [],
+        components: []
+      });
     } else {
-      await interaction.editReply({ content: message });
+      await interaction.followUp({ content: message, flags: 64 });
     }
   } catch (error) {
     console.error('Process registration error:', error);
@@ -679,10 +729,15 @@ async function processRegistration(interaction, raid, character, registrationTyp
       errorMessage = '❌ You are already registered for this raid!';
     }
     
+    // ✅ FIX: Use editReply to avoid spam
     if (interaction.deferred) {
-      await interaction.followUp({ content: errorMessage, flags: 64 });
+      await interaction.editReply({ 
+        content: errorMessage,
+        embeds: [],
+        components: []
+      });
     } else {
-      await interaction.editReply({ content: errorMessage });
+      await interaction.followUp({ content: errorMessage, flags: 64 });
     }
   }
 }
