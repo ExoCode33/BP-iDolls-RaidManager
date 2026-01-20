@@ -81,9 +81,10 @@ async function handleStartSelect(interaction) {
       const role = await guild.roles.fetch(raid.main_role_id);
       
       if (role) {
-        console.log(`🧹 Cleaning up role: ${role.name} (${role.id})`);
+        console.log(`🧹 [START] Cleaning up role: ${role.name} (${role.id})`);
         
-        // Fetch all members with this role
+        // Force fetch members to ensure we have the latest list
+        await guild.members.fetch();
         const membersWithRole = role.members;
         
         if (membersWithRole.size > 0) {
@@ -92,20 +93,22 @@ async function handleStartSelect(interaction) {
           // Remove role from each member
           for (const [memberId, member] of membersWithRole) {
             try {
-              await member.roles.remove(raid.main_role_id);
+              await member.roles.remove(role);
               console.log(`   ✅ Removed from ${member.user.tag}`);
             } catch (removeErr) {
               console.error(`   ❌ Failed to remove from ${member.user.tag}:`, removeErr.message);
             }
           }
           
-          console.log(`✅ Role cleanup complete!`);
+          console.log(`✅ [START] Role cleanup complete!`);
         } else {
           console.log(`   No members have this role - skipping cleanup`);
         }
+      } else {
+        console.error(`❌ [START] Role not found: ${raid.main_role_id}`);
       }
     } catch (cleanupErr) {
-      console.error('⚠️ Role cleanup failed (non-critical):', cleanupErr.message);
+      console.error('⚠️ [START] Role cleanup failed (non-critical):', cleanupErr.message);
       // Continue with posting even if cleanup fails
     }
 
