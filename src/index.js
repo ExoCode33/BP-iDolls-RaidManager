@@ -207,6 +207,25 @@ ON CONFLICT (key) DO NOTHING;
       console.log('✅ Successfully added updated_at column');
     }
 
+    // ✅ NEW - Add lock_notification_message_id column for tracking lock notification messages
+    console.log('🔄 Checking for lock_notification_message_id column...');
+    const checkLockNotif = await eventDB.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name = 'raids' AND column_name = 'lock_notification_message_id'
+    `);
+
+    if (checkLockNotif.rows.length === 0) {
+      console.log('📝 Adding lock_notification_message_id column to raids table...');
+      await eventDB.query(`
+        ALTER TABLE raids 
+        ADD COLUMN lock_notification_message_id VARCHAR(20)
+      `);
+      console.log('✅ Successfully added lock_notification_message_id column');
+    } else {
+      console.log('✅ Lock_notification_message_id column already exists');
+    }
+
     // ✅ AUTO-FIX: Update status constraint to allow 'assist'
     console.log('🔄 Checking status constraint...');
     try {
