@@ -512,27 +512,28 @@ async function handleManualIGNModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await interaction.deferReply({ flags: 64 });
+  // ✅ FIX: Use update instead of deferReply to edit the original message
+  await interaction.deferUpdate();
 
   try {
     const state = manualRegState.get(interaction.user.id);
     if (!state) {
-      return await interaction.editReply({ content: '❌ Session expired. Please start again.' });
+      return await interaction.followUp({ content: '❌ Session expired. Please start again.', flags: 64 });
     }
 
     const ign = interaction.fields.getTextInputValue('ign_input').trim();
     
     if (!ign) {
-      return await interaction.editReply({ content: '❌ IGN cannot be empty!' });
+      return await interaction.followUp({ content: '❌ IGN cannot be empty!', flags: 64 });
     }
 
     const raid = await getRaid(state.raidId);
     if (!raid) {
-      return await interaction.editReply({ content: '❌ Raid not found!' });
+      return await interaction.followUp({ content: '❌ Raid not found!', flags: 64 });
     }
 
     if (raid.status !== 'open') {
-      return await interaction.editReply({ content: '❌ This raid is no longer open for registration!' });
+      return await interaction.followUp({ content: '❌ This raid is no longer open for registration!', flags: 64 });
     }
 
     const character = {
@@ -542,13 +543,20 @@ async function handleManualIGNModal(interaction) {
       ability_score: state.ability_score
     };
 
+    // ✅ Clear the embed before processing
+    await interaction.editReply({ 
+      content: '⏳ Processing registration...',
+      embeds: [],
+      components: []
+    });
+
     await processRegistration(interaction, raid, character, state.registrationType, 'manual');
     
     manualRegState.delete(interaction.user.id);
 
   } catch (error) {
     console.error('Manual IGN modal error:', error);
-    await interaction.editReply({ content: '❌ An error occurred. Please try again.' });
+    await interaction.followUp({ content: '❌ An error occurred. Please try again.', flags: 64 });
   }
 }
 
@@ -685,19 +693,11 @@ async function processRegistration(interaction, raid, character, registrationTyp
 
     if (!result.success) {
       if (result.error === 'ALREADY_REGISTERED') {
-        // ✅ FIX: Use editReply instead of followUp to avoid ephemeral spam
-        if (interaction.deferred) {
-          return await interaction.editReply({ 
-            content: '❌ You are already registered for this raid!',
-            embeds: [],
-            components: []
-          });
-        } else {
-          return await interaction.followUp({ 
-            content: '❌ You are already registered for this raid!',
-            flags: 64
-          });
-        }
+        return await interaction.editReply({ 
+          content: '❌ You are already registered for this raid!',
+          embeds: [],
+          components: []
+        });
       }
       throw new Error(result.error || 'Registration failed');
     }
@@ -719,16 +719,12 @@ async function processRegistration(interaction, raid, character, registrationTyp
     if (status === 'waitlist') message = '✅ Added to waitlist!';
     if (status === 'assist') message = '✅ Marked as assist!';
 
-    // ✅ FIX: Always use editReply to replace the embed, never followUp
-    if (interaction.deferred) {
-      await interaction.editReply({ 
-        content: message,
-        embeds: [],
-        components: []
-      });
-    } else {
-      await interaction.followUp({ content: message, flags: 64 });
-    }
+    // ✅ Always use editReply to replace content
+    await interaction.editReply({ 
+      content: message,
+      embeds: [],
+      components: []
+    });
   } catch (error) {
     console.error('Process registration error:', error);
     
@@ -737,16 +733,11 @@ async function processRegistration(interaction, raid, character, registrationTyp
       errorMessage = '❌ You are already registered for this raid!';
     }
     
-    // ✅ FIX: Use editReply to avoid spam
-    if (interaction.deferred) {
-      await interaction.editReply({ 
-        content: errorMessage,
-        embeds: [],
-        components: []
-      });
-    } else {
-      await interaction.followUp({ content: errorMessage, flags: 64 });
-    }
+    await interaction.editReply({ 
+      content: errorMessage,
+      embeds: [],
+      components: []
+    });
   }
 }
 
