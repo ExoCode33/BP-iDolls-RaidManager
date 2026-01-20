@@ -78,13 +78,17 @@ function startReminderScheduler(client) {
                 
                 // Send notification to raid channel with role ping
                 const timestamp = Math.floor(raidStartTime.getTime() / 1000);
-                await channel.send({
+                const lockNotification = await channel.send({
                   content: `<@&${raid.main_role_id}> Thank you for signing up! **${raid.name}** is locked and ready! We start <t:${timestamp}:R> - see you soon! ✨`,
                   allowedMentions: { 
                     parse: ['roles'],
                     roles: [raid.main_role_id] 
                   }
                 });
+                
+                // ✅ NEW: Save lock notification message ID
+                const { updateRaid } = require('../database/queries');
+                await updateRaid(raid.id, { lock_notification_message_id: lockNotification.id });
                 
                 console.log(`✅ Auto-locked raid ${raid.id} and updated message`);
               } catch (err) {
@@ -208,6 +212,18 @@ function startReminderScheduler(client) {
               console.log(`✅ Deleted message for raid ${raid.id}`);
             } catch (err) {
               console.error(`Failed to delete message for raid ${raid.id}:`, err);
+            }
+          }
+          
+          // ✅ NEW: Delete lock notification message if it exists
+          if (raid.lock_notification_message_id && raid.channel_id) {
+            try {
+              const channel = await client.channels.fetch(raid.channel_id);
+              const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
+              await lockMessage.delete();
+              console.log(`✅ Deleted lock notification for raid ${raid.id}`);
+            } catch (err) {
+              console.error(`Failed to delete lock notification for raid ${raid.id}:`, err);
             }
           }
           
