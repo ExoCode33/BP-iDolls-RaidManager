@@ -78,9 +78,9 @@ function createManualRegEmbed(step, total, title, description) {
   const titleLine = centerText(title);
   const descLines = description.split('\n').map(line => centerText(line));
   
-  const progress = step / total;
-  const filledBars = Math.floor(progress * 10);
-  const emptyBars = 10 - filledBars;
+  // ✅ FIX: Show hearts based on actual step count, not scaled to 10
+  const filledBars = step;  // Show exactly 'step' number of filled hearts
+  const emptyBars = total - step;  // Remaining hearts
   const progressBar = '♥'.repeat(filledBars) + '♡'.repeat(emptyBars);
   const progressText = `${progressBar} ${step}/${total}`;
   
