@@ -33,9 +33,6 @@ async function handleNameModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  // ✅ FIX: Use deferUpdate to update existing message instead of creating new one
-  await interaction.deferUpdate();
-
   try {
     const name = interaction.fields.getTextInputValue('name');
     
@@ -57,22 +54,27 @@ async function handleNameModal(interaction) {
 
     const row = new ActionRowBuilder().addComponents(dateButton, backButton);
 
-    await interaction.editReply({
+    // ✅ FIX: Reply immediately instead of deferUpdate for modal submissions
+    await interaction.update({
       content: `**Step 2/5:** Enter the date\n**Name:** ${name}\n\nClick the button below to open the date input.`,
       components: [row]
     });
   } catch (error) {
     console.error('Name modal error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
+    
+    // Try to respond if we haven't yet
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred! Please try again.',
+        ephemeral: true
+      });
+    }
   }
 }
 
 async function handleDateModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
-
-  // ✅ FIX: Use deferUpdate to update existing message instead of creating new one
-  await interaction.deferUpdate();
 
   try {
     const date = interaction.fields.getTextInputValue('date');
@@ -81,14 +83,20 @@ async function handleDateModal(interaction) {
     // Check format first
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-12-31)');
+      return await interaction.update({
+        content: '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-12-31)',
+        components: []
+      });
     }
     
     // ✅ FIX: Validate actual date
     const dateObj = new Date(date + 'T00:00:00');
     if (isNaN(dateObj.getTime())) {
       raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Invalid date! Please enter a valid date.');
+      return await interaction.update({
+        content: '❌ Invalid date! Please enter a valid date.',
+        components: []
+      });
     }
     
     // ✅ FIX: Prevent dates in the past
@@ -96,7 +104,10 @@ async function handleDateModal(interaction) {
     today.setHours(0, 0, 0, 0);
     if (dateObj < today) {
       raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Date must be today or in the future!');
+      return await interaction.update({
+        content: '❌ Date must be today or in the future!',
+        components: []
+      });
     }
     
     const state = raidCreationState.get(interaction.user.id) || {};
@@ -124,13 +135,21 @@ async function handleDateModal(interaction) {
     const row1 = new ActionRowBuilder().addComponents(selectMenu);
     const row2 = new ActionRowBuilder().addComponents(backButton);
 
-    await interaction.editReply({
+    // ✅ FIX: Reply immediately instead of deferUpdate
+    await interaction.update({
       content: `**Step 3/5:** Select raid time\n**Name:** ${state.name}\n**Date:** ${date}`,
       components: [row1, row2]
     });
   } catch (error) {
     console.error('Date modal error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
+    
+    // Try to respond if we haven't yet
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: '❌ An error occurred! Please try again.',
+        ephemeral: true
+      });
+    }
   }
 }
 
