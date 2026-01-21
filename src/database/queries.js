@@ -83,7 +83,8 @@ async function updateRaid(raidId, data) {
   const ALLOWED_FIELDS = [
     'name', 'raid_size', 'start_time', 'tank_slots', 'support_slots', 
     'dps_slots', 'channel_id', 'main_role_id', 'raid_slot', 'status',
-    'message_id', 'reminded_30m', 'locked', 'preset_id'
+    'message_id', 'reminded_30m', 'locked', 'preset_id',
+    'lock_notification_message_id', 'reminder_message_id'
   ];
 
   const fields = [];
