@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { getUpcomingRaids, markRaidReminded, getActiveRaids, updateRaidStatus, lockRaid } = require('../database/queries');
+const { getUpcomingRaids, markRaidReminded, getActiveRaids, updateRaidStatus, lockRaid, updateRaid } = require('../database/queries');
 
 // Track last check time to detect missed reminders
 let lastCheckTime = new Date();
@@ -81,13 +81,11 @@ function startReminderScheduler(client) {
                 const lockNotification = await channel.send({
                   content: `<@&${raid.main_role_id}> Thank you for signing up! **${raid.name}** is locked and ready! We start <t:${timestamp}:R> - see you soon! ✨`,
                   allowedMentions: { 
-                    parse: ['roles'],
                     roles: [raid.main_role_id] 
                   }
                 });
                 
-                // ✅ NEW: Save lock notification message ID
-                const { updateRaid } = require('../database/queries');
+                // ✅ Save lock notification message ID
                 await updateRaid(raid.id, { lock_notification_message_id: lockNotification.id });
                 
                 console.log(`✅ Auto-locked raid ${raid.id} and updated message`);
