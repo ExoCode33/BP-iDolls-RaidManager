@@ -1,9 +1,13 @@
 const cron = require('node-cron');
-const { getUpcomingRaids, markRaidReminded, getActiveRaids, updateRaidStatus, lockRaid, updateRaid } = require('../database/queries');
+const { getActiveRaids, markRaidReminded, updateRaidStatus, lockRaid, updateRaid, getRaidRegistrations } = require('../database/queries');
 
 // Track last check time to detect missed reminders
 let lastCheckTime = new Date();
-const REMINDER_WINDOW = 30 * 60 * 1000; // 30 minutes in milliseconds
+
+// ✅ NEW - Configurable reminder hours (default 0.5 hours = 30 minutes)
+const REMINDER_HOURS = parseFloat(process.env.REMINDER_HOURS || '0.5');
+const REMINDER_MINUTES = REMINDER_HOURS * 60;
+const REMINDER_MS = REMINDER_MINUTES * 60 * 1000;
 
 // ✅ NEW - Auto-lock configuration (in hours before raid start)
 // Set to 0 to disable auto-lock
@@ -14,7 +18,7 @@ function startReminderScheduler(client) {
   
   // Run every minute - handles reminders, auto-lock, AND cleanup
   cron.schedule('* * * * *', async () => {
-    if (process.env.REMINDER_30MIN !== 'true') return;
+    if (process.env.REMINDER !== 'true') return;
 
     const currentTime = new Date();
     const timeSinceLastCheck = currentTime - lastCheckTime;
@@ -32,9 +36,8 @@ function startReminderScheduler(client) {
           // Skip already locked raids
           if (raid.locked) return false;
           
-          // ✅ FIX - Skip raids that haven't been posted yet
+          // Skip raids that haven't been posted yet
           if (!raid.message_id) {
-            console.log(`⏭️ Skipping auto-lock for raid ${raid.id} - not posted yet`);
             return false;
           }
           
@@ -64,7 +67,6 @@ function startReminderScheduler(client) {
             // Update the Discord message to show locked state
             if (raid.message_id && raid.channel_id) {
               try {
-                const { getRaidRegistrations } = require('../database/queries');
                 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
                 
                 const channel = await client.channels.fetch(raid.channel_id);
@@ -85,7 +87,7 @@ function startReminderScheduler(client) {
                   }
                 });
                 
-                // ✅ Save lock notification message ID
+                // Save lock notification message ID
                 await updateRaid(raid.id, { lock_notification_message_id: lockNotification.id });
                 
                 console.log(`✅ Auto-locked raid ${raid.id} and updated message`);
@@ -101,7 +103,20 @@ function startReminderScheduler(client) {
       }
 
       // ========== REMINDERS ==========
-      const upcomingRaids = await getUpcomingRaids();
+      // Get raids that should receive reminders
+      const activeRaids = await getActiveRaids();
+      const upcomingRaids = activeRaids.filter(raid => {
+        if (raid.reminded_30m) return false; // Already reminded
+        
+        const raidStartTime = new Date(raid.start_time);
+        const timeUntilRaid = raidStartTime - currentTime;
+        
+        // Check if within reminder window
+        const lowerBound = REMINDER_MS - (5 * 60 * 1000); // 5 min before
+        const upperBound = REMINDER_MS + (5 * 60 * 1000); // 5 min after
+        
+        return timeUntilRaid >= lowerBound && timeUntilRaid <= upperBound && timeUntilRaid > 0;
+      });
 
       if (upcomingRaids.length > 0) {
         console.log(`📋 Processing ${upcomingRaids.length} upcoming raid reminder(s)...`);
@@ -112,15 +127,8 @@ function startReminderScheduler(client) {
           // Calculate time until raid starts
           const raidStartTime = new Date(raid.start_time);
           const timeUntilRaid = raidStartTime - currentTime;
+          const minutesUntilRaid = Math.floor(timeUntilRaid / 60000);
           
-          // Only send if within reminder window (25-35 minutes to handle delays)
-          if (timeUntilRaid < 25 * 60 * 1000 || timeUntilRaid > 35 * 60 * 1000) {
-            console.log(`⏭️ Skipping raid ${raid.id} - outside reminder window (${Math.floor(timeUntilRaid / 60000)}m until start)`);
-            // Still mark as reminded to prevent future attempts
-            await markRaidReminded(raid.id);
-            continue;
-          }
-
           const channel = await client.channels.fetch(raid.channel_id).catch(err => {
             console.error(`Failed to fetch channel ${raid.channel_id}:`, err);
             return null;
@@ -142,7 +150,7 @@ function startReminderScheduler(client) {
           await updateRaid(raid.id, { reminder_message_id: reminderMessage.id });
 
           await markRaidReminded(raid.id);
-          console.log(`✅ Sent reminder for raid ${raid.id}: "${raid.name}"`);
+          console.log(`✅ Sent reminder for raid ${raid.id}: "${raid.name}" (${minutesUntilRaid} min before start)`);
 
         } catch (error) {
           console.error(`❌ Failed to send reminder for raid ${raid.id}:`, error);
@@ -157,10 +165,67 @@ function startReminderScheduler(client) {
         }
       }
 
-      // ========== AUTO CLEANUP ==========
-      // Clean up raids that are past their start time
-      const activeRaids = await getActiveRaids();
-      const raidsToCleanup = activeRaids.filter(raid => {
+      // ========== AUTO CLEANUP - IMMEDIATE MESSAGE DELETION ==========
+      // Delete reminder and lock messages as soon as raid time passes
+      const allActiveRaids = await getActiveRaids();
+      const raidsJustStarted = allActiveRaids.filter(raid => {
+        const raidStartTime = new Date(raid.start_time);
+        const timeSinceStart = currentTime - raidStartTime;
+        
+        // Raid has started (time is in the past) but hasn't been fully cleaned up yet
+        return timeSinceStart > 0 && timeSinceStart <= 2 * 60 * 60 * 1000;
+      });
+
+      if (raidsJustStarted.length > 0) {
+        console.log(`🧹 Checking ${raidsJustStarted.length} started raid(s) for message cleanup...`);
+      }
+
+      for (const raid of raidsJustStarted) {
+        try {
+          // Delete lock notification message immediately when raid starts
+          if (raid.lock_notification_message_id && raid.channel_id) {
+            try {
+              const channel = await client.channels.fetch(raid.channel_id);
+              const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
+              await lockMessage.delete();
+              await updateRaid(raid.id, { lock_notification_message_id: null });
+              console.log(`✅ Deleted lock notification for started raid ${raid.id}`);
+            } catch (err) {
+              if (err.code === 10008) {
+                // Message already deleted
+                await updateRaid(raid.id, { lock_notification_message_id: null });
+              } else {
+                console.error(`Failed to delete lock notification for raid ${raid.id}:`, err);
+              }
+            }
+          }
+
+          // Delete reminder message immediately when raid starts
+          if (raid.reminder_message_id && raid.channel_id) {
+            try {
+              const channel = await client.channels.fetch(raid.channel_id);
+              const reminderMessage = await channel.messages.fetch(raid.reminder_message_id);
+              await reminderMessage.delete();
+              await updateRaid(raid.id, { reminder_message_id: null });
+              console.log(`✅ Deleted reminder message for started raid ${raid.id}`);
+            } catch (err) {
+              if (err.code === 10008) {
+                // Message already deleted
+                await updateRaid(raid.id, { reminder_message_id: null });
+              } else {
+                console.error(`Failed to delete reminder message for raid ${raid.id}:`, err);
+              }
+            }
+          }
+          
+        } catch (error) {
+          console.error(`❌ Failed to clean messages for started raid ${raid.id}:`, error);
+        }
+      }
+
+      // ========== AUTO CLEANUP - FULL CLEANUP AFTER 2 HOURS ==========
+      // Complete cleanup 2 hours after raid starts (delete embed, remove roles, mark completed)
+      const raidsToCleanup = allActiveRaids.filter(raid => {
         const raidStartTime = new Date(raid.start_time);
         const timeSinceStart = currentTime - raidStartTime;
         
@@ -204,39 +269,44 @@ function startReminderScheduler(client) {
             console.error(`Failed to remove roles for raid ${raid.id}:`, err);
           }
           
-          // Delete the raid message
+          // Delete the raid embed message (2 hours after start)
           if (raid.message_id && raid.channel_id) {
             try {
               const channel = await client.channels.fetch(raid.channel_id);
               const message = await channel.messages.fetch(raid.message_id);
               await message.delete();
-              console.log(`✅ Deleted message for raid ${raid.id}`);
+              console.log(`✅ Deleted embed message for raid ${raid.id}`);
             } catch (err) {
-              console.error(`Failed to delete message for raid ${raid.id}:`, err);
+              console.error(`Failed to delete embed message for raid ${raid.id}:`, err);
             }
           }
           
-          // ✅ NEW: Delete lock notification message if it exists
+          // Clean up any remaining notification messages (in case they weren't deleted earlier)
           if (raid.lock_notification_message_id && raid.channel_id) {
             try {
               const channel = await client.channels.fetch(raid.channel_id);
               const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
               await lockMessage.delete();
-              console.log(`✅ Deleted lock notification for raid ${raid.id}`);
+              console.log(`✅ Deleted remaining lock notification for raid ${raid.id}`);
             } catch (err) {
-              console.error(`Failed to delete lock notification for raid ${raid.id}:`, err);
+              // Ignore if already deleted
+              if (err.code !== 10008) {
+                console.error(`Failed to delete lock notification for raid ${raid.id}:`, err);
+              }
             }
           }
 
-          // ✅ NEW: Delete reminder message if it exists
           if (raid.reminder_message_id && raid.channel_id) {
             try {
               const channel = await client.channels.fetch(raid.channel_id);
               const reminderMessage = await channel.messages.fetch(raid.reminder_message_id);
               await reminderMessage.delete();
-              console.log(`✅ Deleted reminder message for raid ${raid.id}`);
+              console.log(`✅ Deleted remaining reminder message for raid ${raid.id}`);
             } catch (err) {
-              console.error(`Failed to delete reminder message for raid ${raid.id}:`, err);
+              // Ignore if already deleted
+              if (err.code !== 10008) {
+                console.error(`Failed to delete reminder message for raid ${raid.id}:`, err);
+              }
             }
           }
           
@@ -264,34 +334,43 @@ function startReminderScheduler(client) {
       console.log('🔄 Running startup checks...');
       
       // === Reminder catch-up ===
-      const upcomingRaids = await getUpcomingRaids();
+      const activeRaids = await getActiveRaids();
+      const now = new Date();
+      
+      const upcomingRaids = activeRaids.filter(raid => {
+        if (raid.reminded_30m) return false;
+        
+        const raidStartTime = new Date(raid.start_time);
+        const timeUntilRaid = raidStartTime - now;
+        
+        const lowerBound = REMINDER_MS - (15 * 60 * 1000); // Extended window
+        const upperBound = REMINDER_MS + (15 * 60 * 1000);
+        
+        return timeUntilRaid >= lowerBound && timeUntilRaid <= upperBound && timeUntilRaid > 0;
+      });
       
       if (upcomingRaids.length > 0) {
         console.log(`📋 Found ${upcomingRaids.length} raid(s) that may have missed reminders during downtime`);
         
         for (const raid of upcomingRaids) {
           const raidStartTime = new Date(raid.start_time);
-          const timeUntilRaid = raidStartTime - new Date();
+          const timeUntilRaid = raidStartTime - now;
+          const minutesUntilRaid = Math.floor(timeUntilRaid / 60000);
           
-          if (timeUntilRaid > 15 * 60 * 1000 && timeUntilRaid < 45 * 60 * 1000) {
-            console.log(`📨 Sending catch-up reminder for raid ${raid.id}: "${raid.name}"`);
+          console.log(`📨 Sending catch-up reminder for raid ${raid.id}: "${raid.name}"`);
+          
+          try {
+            const channel = await client.channels.fetch(raid.channel_id);
+            const timestamp = Math.floor(raidStartTime.getTime() / 1000);
             
-            try {
-              const channel = await client.channels.fetch(raid.channel_id);
-              const timestamp = Math.floor(raidStartTime.getTime() / 1000);
-              
-              await channel.send(
-                `<@&${raid.main_role_id}> 🔔 Your raid "${raid.name}" starts <t:${timestamp}:R>!`
-              );
-              
-              await markRaidReminded(raid.id);
-              console.log(`✅ Sent catch-up reminder for raid ${raid.id}`);
-            } catch (err) {
-              console.error(`Failed to send catch-up reminder for raid ${raid.id}:`, err);
-            }
-          } else if (timeUntilRaid < 15 * 60 * 1000) {
+            await channel.send(
+              `<@&${raid.main_role_id}> 🔔 Your raid "${raid.name}" starts <t:${timestamp}:R>!`
+            );
+            
             await markRaidReminded(raid.id);
-            console.log(`⏭️ Raid ${raid.id} starting too soon (${Math.floor(timeUntilRaid / 60000)}m), marking as reminded`);
+            console.log(`✅ Sent catch-up reminder for raid ${raid.id}`);
+          } catch (err) {
+            console.error(`Failed to send catch-up reminder for raid ${raid.id}:`, err);
           }
         }
       } else {
@@ -301,13 +380,10 @@ function startReminderScheduler(client) {
       // === Auto-lock catch-up ===
       if (AUTO_LOCK_HOURS > 0) {
         console.log('🔄 Checking for raids that should be locked...');
-        const activeRaids = await getActiveRaids();
-        const now = new Date();
+        const allActiveRaids = await getActiveRaids();
         
-        const raidsNeedingLock = activeRaids.filter(raid => {
+        const raidsNeedingLock = allActiveRaids.filter(raid => {
           if (raid.locked) return false;
-          
-          // ✅ FIX - Skip raids that haven't been posted yet
           if (!raid.message_id) return false;
           
           const raidStartTime = new Date(raid.start_time);
@@ -327,7 +403,6 @@ function startReminderScheduler(client) {
               
               // Update message if exists
               if (raid.message_id && raid.channel_id) {
-                const { getRaidRegistrations } = require('../database/queries');
                 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
                 
                 const channel = await client.channels.fetch(raid.channel_id);
@@ -350,10 +425,57 @@ function startReminderScheduler(client) {
 
       // === Cleanup old raids ===
       console.log('🔄 Running startup cleanup check...');
-      const activeRaids = await getActiveRaids();
-      const now = new Date();
+      const allActiveRaids = await getActiveRaids();
       
-      const oldRaids = activeRaids.filter(raid => {
+      // Check for raids that have started but aren't fully cleaned up yet
+      const startedRaids = allActiveRaids.filter(raid => {
+        const raidStartTime = new Date(raid.start_time);
+        const timeSinceStart = now - raidStartTime;
+        return timeSinceStart > 0 && timeSinceStart <= 2 * 60 * 60 * 1000;
+      });
+
+      if (startedRaids.length > 0) {
+        console.log(`🧹 Found ${startedRaids.length} started raid(s) with messages to delete`);
+        
+        for (const raid of startedRaids) {
+          try {
+            // Delete lock notification immediately
+            if (raid.lock_notification_message_id && raid.channel_id) {
+              try {
+                const channel = await client.channels.fetch(raid.channel_id);
+                const lockMessage = await channel.messages.fetch(raid.lock_notification_message_id);
+                await lockMessage.delete();
+                await updateRaid(raid.id, { lock_notification_message_id: null });
+                console.log(`✅ Deleted lock notification for raid ${raid.id}`);
+              } catch (err) {
+                if (err.code === 10008) {
+                  await updateRaid(raid.id, { lock_notification_message_id: null });
+                }
+              }
+            }
+
+            // Delete reminder immediately
+            if (raid.reminder_message_id && raid.channel_id) {
+              try {
+                const channel = await client.channels.fetch(raid.channel_id);
+                const reminderMessage = await channel.messages.fetch(raid.reminder_message_id);
+                await reminderMessage.delete();
+                await updateRaid(raid.id, { reminder_message_id: null });
+                console.log(`✅ Deleted reminder for raid ${raid.id}`);
+              } catch (err) {
+                if (err.code === 10008) {
+                  await updateRaid(raid.id, { reminder_message_id: null });
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`Failed to cleanup messages for raid ${raid.id}:`, err);
+          }
+        }
+      }
+      
+      // Check for raids that need full cleanup (2+ hours after start)
+      const oldRaids = allActiveRaids.filter(raid => {
         const raidStartTime = new Date(raid.start_time);
         const timeSinceStart = now - raidStartTime;
         return timeSinceStart > 2 * 60 * 60 * 1000;
@@ -362,8 +484,40 @@ function startReminderScheduler(client) {
       if (oldRaids.length > 0) {
         console.log(`🧹 Found ${oldRaids.length} old raid(s) to clean up`);
         for (const raid of oldRaids) {
-          await updateRaidStatus(raid.id, 'completed');
-          console.log(`✅ Marked raid ${raid.id} as completed`);
+          try {
+            await updateRaidStatus(raid.id, 'completed');
+            
+            // Remove roles
+            const guild = client.guilds.cache.first();
+            if (guild) {
+              const role = guild.roles.cache.get(raid.main_role_id);
+              if (role) {
+                const members = role.members;
+                for (const [memberId, member] of members) {
+                  try {
+                    await member.roles.remove(role);
+                  } catch (err) {
+                    console.error(`Failed to remove role from ${memberId}:`, err);
+                  }
+                }
+              }
+            }
+            
+            // Delete embed message
+            if (raid.message_id && raid.channel_id) {
+              try {
+                const channel = await client.channels.fetch(raid.channel_id);
+                const message = await channel.messages.fetch(raid.message_id);
+                await message.delete();
+              } catch (err) {
+                console.error(`Failed to delete embed for raid ${raid.id}:`, err);
+              }
+            }
+            
+            console.log(`✅ Marked raid ${raid.id} as completed`);
+          } catch (err) {
+            console.error(`Failed to cleanup raid ${raid.id}:`, err);
+          }
         }
       } else {
         console.log('✅ No old raids to clean up');
@@ -375,9 +529,11 @@ function startReminderScheduler(client) {
   }, 5000); // Wait 5 seconds after bot starts
 
   console.log('✅ Reminder scheduler started');
-  console.log(`ℹ️  Reminders enabled: ${process.env.REMINDER_30MIN === 'true' ? 'YES' : 'NO'}`);
+  console.log(`ℹ️  Reminders enabled: ${process.env.REMINDER === 'true' ? 'YES' : 'NO'}`);
+  console.log(`ℹ️  Reminder time: ${REMINDER_HOURS} hours (${REMINDER_MINUTES} minutes) before raid start`);
   console.log(`ℹ️  Auto-lock enabled: ${AUTO_LOCK_HOURS > 0 ? `YES (${AUTO_LOCK_HOURS} hours before start)` : 'NO'}`);
-  console.log(`ℹ️  Auto-cleanup enabled: YES (2 hours after raid start)`);
+  console.log(`ℹ️  Message cleanup: Reminder & lock messages deleted when raid starts`);
+  console.log(`ℹ️  Full cleanup: Embed deleted & roles removed 2 hours after raid start`);
 }
 
 // ✅ Health check function
@@ -389,7 +545,8 @@ function getSchedulerHealth() {
     isHealthy: timeSinceLastCheck < 120000,
     lastCheckTime: lastCheckTime.toISOString(),
     timeSinceLastCheck: Math.floor(timeSinceLastCheck / 1000),
-    enabled: process.env.REMINDER_30MIN === 'true',
+    enabled: process.env.REMINDER === 'true',
+    reminderHours: REMINDER_HOURS,
     autoLockHours: AUTO_LOCK_HOURS
   };
 }
