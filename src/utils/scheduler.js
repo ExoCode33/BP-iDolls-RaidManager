@@ -328,6 +328,46 @@ function startReminderScheduler(client) {
     }
   });
 
+  // ✅ NEW - Database cleanup job (runs daily at 3 AM)
+  cron.schedule('0 3 * * *', async () => {
+    console.log('🗑️ Running daily database cleanup...');
+    
+    try {
+      const { eventDB } = require('../database/connection');
+      const DELETE_AFTER_DAYS = parseInt(process.env.DELETE_OLD_RAIDS_AFTER_DAYS || '30');
+      
+      if (DELETE_AFTER_DAYS === 0) {
+        console.log('⏭️ Auto-delete disabled (DELETE_OLD_RAIDS_AFTER_DAYS = 0)');
+        return;
+      }
+      
+      // Calculate cutoff date
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - DELETE_AFTER_DAYS);
+      
+      // Delete old completed/cancelled raids and their registrations
+      const result = await eventDB.query(
+        `DELETE FROM raids 
+         WHERE status IN ('completed', 'cancelled') 
+         AND updated_at < $1
+         RETURNING id, name, status`,
+        [cutoffDate]
+      );
+      
+      if (result.rows.length > 0) {
+        console.log(`✅ Deleted ${result.rows.length} old raid(s):`);
+        result.rows.forEach(raid => {
+          console.log(`   - ID ${raid.id}: "${raid.name}" (${raid.status})`);
+        });
+      } else {
+        console.log('✅ No old raids to delete');
+      }
+      
+    } catch (error) {
+      console.error('❌ Database cleanup failed:', error);
+    }
+  });
+
   // ✅ Catch-up check on startup
   setTimeout(async () => {
     try {
@@ -534,6 +574,7 @@ function startReminderScheduler(client) {
   console.log(`ℹ️  Auto-lock enabled: ${AUTO_LOCK_HOURS > 0 ? `YES (${AUTO_LOCK_HOURS} hours before start)` : 'NO'}`);
   console.log(`ℹ️  Message cleanup: Reminder & lock messages deleted when raid starts`);
   console.log(`ℹ️  Full cleanup: Embed deleted & roles removed 2 hours after raid start`);
+  console.log(`ℹ️  Database cleanup: Delete raids older than ${parseInt(process.env.DELETE_OLD_RAIDS_AFTER_DAYS || '30')} days (runs daily at 3 AM)`);
 }
 
 // ✅ Health check function
