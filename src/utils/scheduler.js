@@ -173,7 +173,10 @@ function startReminderScheduler(client) {
         const timeSinceStart = currentTime - raidStartTime;
         
         // Raid has started (time is in the past) but hasn't been fully cleaned up yet
-        return timeSinceStart > 0 && timeSinceStart <= 2 * 60 * 60 * 1000;
+        // AND still has messages to delete
+        return timeSinceStart > 0 && 
+               timeSinceStart <= 2 * 60 * 60 * 1000 &&
+               (raid.lock_notification_message_id || raid.reminder_message_id);
       });
 
       if (raidsJustStarted.length > 0) {
@@ -182,6 +185,8 @@ function startReminderScheduler(client) {
 
       for (const raid of raidsJustStarted) {
         try {
+          let messagesDeleted = false;
+          
           // Delete lock notification message immediately when raid starts
           if (raid.lock_notification_message_id && raid.channel_id) {
             try {
@@ -190,6 +195,7 @@ function startReminderScheduler(client) {
               await lockMessage.delete();
               await updateRaid(raid.id, { lock_notification_message_id: null });
               console.log(`✅ Deleted lock notification for started raid ${raid.id}`);
+              messagesDeleted = true;
             } catch (err) {
               if (err.code === 10008) {
                 // Message already deleted
@@ -208,6 +214,7 @@ function startReminderScheduler(client) {
               await reminderMessage.delete();
               await updateRaid(raid.id, { reminder_message_id: null });
               console.log(`✅ Deleted reminder message for started raid ${raid.id}`);
+              messagesDeleted = true;
             } catch (err) {
               if (err.code === 10008) {
                 // Message already deleted
@@ -216,6 +223,14 @@ function startReminderScheduler(client) {
                 console.error(`Failed to delete reminder message for raid ${raid.id}:`, err);
               }
             }
+          }
+          
+          if (!messagesDeleted) {
+            // Clear message IDs even if we couldn't delete (prevents retries)
+            await updateRaid(raid.id, { 
+              lock_notification_message_id: null,
+              reminder_message_id: null 
+            });
           }
           
         } catch (error) {
@@ -325,46 +340,6 @@ function startReminderScheduler(client) {
       if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
         console.error('⚠️ Database connection error in reminder scheduler');
       }
-    }
-  });
-
-  // ✅ NEW - Database cleanup job (runs daily at 3 AM)
-  cron.schedule('0 3 * * *', async () => {
-    console.log('🗑️ Running daily database cleanup...');
-    
-    try {
-      const { eventDB } = require('../database/connection');
-      const DELETE_AFTER_DAYS = parseInt(process.env.DELETE_OLD_RAIDS_AFTER_DAYS || '30');
-      
-      if (DELETE_AFTER_DAYS === 0) {
-        console.log('⏭️ Auto-delete disabled (DELETE_OLD_RAIDS_AFTER_DAYS = 0)');
-        return;
-      }
-      
-      // Calculate cutoff date
-      const cutoffDate = new Date();
-      cutoffDate.setDate(cutoffDate.getDate() - DELETE_AFTER_DAYS);
-      
-      // Delete old completed/cancelled raids and their registrations
-      const result = await eventDB.query(
-        `DELETE FROM raids 
-         WHERE status IN ('completed', 'cancelled') 
-         AND updated_at < $1
-         RETURNING id, name, status`,
-        [cutoffDate]
-      );
-      
-      if (result.rows.length > 0) {
-        console.log(`✅ Deleted ${result.rows.length} old raid(s):`);
-        result.rows.forEach(raid => {
-          console.log(`   - ID ${raid.id}: "${raid.name}" (${raid.status})`);
-        });
-      } else {
-        console.log('✅ No old raids to delete');
-      }
-      
-    } catch (error) {
-      console.error('❌ Database cleanup failed:', error);
     }
   });
 
@@ -567,6 +542,46 @@ function startReminderScheduler(client) {
       console.error('❌ Startup catch-up failed:', error);
     }
   }, 5000); // Wait 5 seconds after bot starts
+
+  // ✅ NEW - Database cleanup job (runs daily at 3 AM)
+  cron.schedule('0 3 * * *', async () => {
+    console.log('🗑️ Running daily database cleanup...');
+    
+    try {
+      const { eventDB } = require('../database/connection');
+      const DELETE_AFTER_DAYS = parseInt(process.env.DELETE_OLD_RAIDS_AFTER_DAYS || '30');
+      
+      if (DELETE_AFTER_DAYS === 0) {
+        console.log('⏭️ Auto-delete disabled (DELETE_OLD_RAIDS_AFTER_DAYS = 0)');
+        return;
+      }
+      
+      // Calculate cutoff date
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - DELETE_AFTER_DAYS);
+      
+      // Delete old completed/cancelled raids and their registrations
+      const result = await eventDB.query(
+        `DELETE FROM raids 
+         WHERE status IN ('completed', 'cancelled') 
+         AND updated_at < $1
+         RETURNING id, name, status`,
+        [cutoffDate]
+      );
+      
+      if (result.rows.length > 0) {
+        console.log(`✅ Deleted ${result.rows.length} old raid(s):`);
+        result.rows.forEach(raid => {
+          console.log(`   - ID ${raid.id}: "${raid.name}" (${raid.status})`);
+        });
+      } else {
+        console.log('✅ No old raids to delete');
+      }
+      
+    } catch (error) {
+      console.error('❌ Database cleanup failed:', error);
+    }
+  });
 
   console.log('✅ Reminder scheduler started');
   console.log(`ℹ️  Reminders enabled: ${process.env.REMINDER === 'true' ? 'YES' : 'NO'}`);
