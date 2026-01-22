@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { getActiveRaids, markRaidReminded, updateRaidStatus, lockRaid, updateRaid, getRaidRegistrations } = require('../database/queries');
+const logger = require('./logger');
 
 // Track last check time to detect missed reminders
 let lastCheckTime = new Date();
@@ -91,6 +92,9 @@ function startReminderScheduler(client) {
                 await updateRaid(raid.id, { lock_notification_message_id: lockNotification.id });
                 
                 console.log(`✅ Auto-locked raid ${raid.id} and updated message`);
+                
+                // Log auto-lock
+                await logger.logRaidLocked(raid, { tag: 'System', id: 'auto' }, true);
               } catch (err) {
                 console.error(`Failed to update message for locked raid ${raid.id}:`, err);
               }
@@ -151,6 +155,9 @@ function startReminderScheduler(client) {
 
           await markRaidReminded(raid.id);
           console.log(`✅ Sent reminder for raid ${raid.id}: "${raid.name}" (${minutesUntilRaid} min before start)`);
+
+          // Log reminder
+          await logger.logReminderSent(raid, minutesUntilRaid);
 
         } catch (error) {
           console.error(`❌ Failed to send reminder for raid ${raid.id}:`, error);
@@ -259,6 +266,9 @@ function startReminderScheduler(client) {
           
           console.log(`🧹 Auto-completing raid ${raid.id}: "${raid.name}" (started ${hoursAgo}h ago)`);
           
+          // Get registrations BEFORE updating status
+          const registrations = await getRaidRegistrations(raid.id);
+          
           // Update status to completed
           await updateRaidStatus(raid.id, 'completed');
           
@@ -326,6 +336,10 @@ function startReminderScheduler(client) {
           }
           
           console.log(`✅ Auto-completed raid ${raid.id}: "${raid.name}"`);
+          
+          // Log auto-complete with summary
+          await logger.logRaidSummary(raid, registrations);
+          await logger.logRaidCompleted(raid, { tag: 'System', id: 'auto' }, registrations.length, true);
           
         } catch (error) {
           console.error(`❌ Failed to auto-complete raid ${raid.id}:`, error);
