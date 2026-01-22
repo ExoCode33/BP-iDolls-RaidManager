@@ -1,69 +1,75 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { setConfig } = require('../../database/queries');
+const logger = require('../../utils/logger');
 
 // ═══════════════════════════════════════════════════════════════
 // SETUP HANDLERS
 // ═══════════════════════════════════════════════════════════════
 
-async function showSetupModal(interaction) {
-  try {
-    console.log(`[SETUP] Showing setup modal for user ${interaction.user.id}`);
-    console.log(`[SETUP] Interaction state: deferred=${interaction.deferred}, replied=${interaction.replied}`);
-    
-    const modal = new ModalBuilder()
-      .setCustomId(`raid_setup_modal_${interaction.user.id}`)
-      .setTitle('⚙️ Setup Raid Roles');
+async function handleSetupMenu(interaction) {
+  await interaction.deferReply({ flags: 64 });
 
-    const raid1Input = new TextInputBuilder()
-      .setCustomId('raid1_role_id')
-      .setLabel('Raid 1 Role ID')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Right-click role → Copy ID')
-      .setRequired(true);
+  const modal = new ModalBuilder()
+    .setCustomId(`raid_setup_modal_${interaction.user.id}`)
+    .setTitle('Raid Bot Setup');
 
-    const raid2Input = new TextInputBuilder()
-      .setCustomId('raid2_role_id')
-      .setLabel('Raid 2 Role ID')
-      .setStyle(TextInputStyle.Short)
-      .setPlaceholder('Right-click role → Copy ID')
-      .setRequired(true);
+  const raid1Input = new TextInputBuilder()
+    .setCustomId('raid1_role')
+    .setLabel('Raid 1 Role ID')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Right-click role → Copy ID')
+    .setRequired(true);
 
-    modal.addComponents(
-      new ActionRowBuilder().addComponents(raid1Input),
-      new ActionRowBuilder().addComponents(raid2Input)
-    );
+  const raid2Input = new TextInputBuilder()
+    .setCustomId('raid2_role')
+    .setLabel('Raid 2 Role ID')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('Right-click role → Copy ID')
+    .setRequired(true);
 
-    await interaction.showModal(modal);
-    console.log(`[SETUP] Modal shown successfully`);
-  } catch (error) {
-    console.error('[SETUP] Error showing modal:', error);
-    console.error('[SETUP] Error details:', {
-      code: error.code,
-      message: error.message,
-      deferred: interaction.deferred,
-      replied: interaction.replied
-    });
-    throw error;
-  }
+  const row1 = new ActionRowBuilder().addComponents(raid1Input);
+  const row2 = new ActionRowBuilder().addComponents(raid2Input);
+
+  modal.addComponents(row1, row2);
+
+  await interaction.showModal(modal);
 }
 
 async function handleSetupModal(interaction) {
   const userId = interaction.customId.split('_').pop();
   if (userId !== interaction.user.id) return;
 
-  await interaction.deferReply({ flags: 64 });
+  await interaction.deferUpdate();
 
   try {
-    const raid1RoleId = interaction.fields.getTextInputValue('raid1_role_id');
-    const raid2RoleId = interaction.fields.getTextInputValue('raid2_role_id');
+    const raid1RoleId = interaction.fields.getTextInputValue('raid1_role').trim();
+    const raid2RoleId = interaction.fields.getTextInputValue('raid2_role').trim();
 
-    // Validate role IDs (should be Discord snowflakes)
-    if (!/^\d{17,20}$/.test(raid1RoleId) || !/^\d{17,20}$/.test(raid2RoleId)) {
-      return await redirectToMainMenu(interaction, '❌ Invalid role IDs! Role IDs should be 17-20 digit numbers.');
+    // Validate role IDs
+    if (!/^\d{17,19}$/.test(raid1RoleId) || !/^\d{17,19}$/.test(raid2RoleId)) {
+      return await interaction.editReply({
+        content: '❌ Invalid role ID format! Role IDs should be 17-19 digits.',
+        components: []
+      });
+    }
+
+    // Verify roles exist
+    try {
+      await interaction.guild.roles.fetch(raid1RoleId);
+      await interaction.guild.roles.fetch(raid2RoleId);
+    } catch (err) {
+      return await interaction.editReply({
+        content: '❌ One or both roles not found! Make sure the bot can see these roles.',
+        components: []
+      });
     }
 
     await setConfig('raid1_role_id', raid1RoleId);
     await setConfig('raid2_role_id', raid2RoleId);
+
+    // Log config changes
+    await logger.logConfigChange('raid1_role_id', 'not set', raid1RoleId, interaction.user);
+    await logger.logConfigChange('raid2_role_id', 'not set', raid2RoleId, interaction.user);
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
@@ -73,62 +79,20 @@ async function handleSetupModal(interaction) {
     const row = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
-      content: `✅ Raid roles configured!\n**Raid 1:** <@&${raid1RoleId}>\n**Raid 2:** <@&${raid2RoleId}>`,
+      content: `✅ Setup complete!\n\n**Raid 1 Role:** <@&${raid1RoleId}>\n**Raid 2 Role:** <@&${raid2RoleId}>\n\nYou can now create and post raids!`,
       components: [row]
     });
+
   } catch (error) {
-    console.error('Setup error:', error);
-    await redirectToMainMenu(interaction, '❌ Failed to setup roles!');
-  }
-}
-
-async function redirectToMainMenu(interaction, errorMessage) {
-  const { 
-    createMainMenuEmbed, 
-    createMainMenuButtons,
-    createRosterDropdown,
-    createLockUnlockDropdown,
-    createPresetDropdown,
-    createEmbedAndRoleDropdown
-  } = require('./main-menu');
-  
-  const embed = await createMainMenuEmbed();
-  const buttonRow = createMainMenuButtons(interaction.user.id);
-  const rosterRow = createRosterDropdown(interaction.user.id);
-  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
-  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
-
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.reply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow],
-      flags: 64
-    });
-  } else {
+    console.error('Setup modal error:', error);
     await interaction.editReply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
+      content: '❌ Setup failed. Please try again.',
+      components: []
     });
   }
-
-  // Auto-remove error message after 3 seconds
-  setTimeout(async () => {
-    try {
-      await interaction.editReply({
-        content: null,
-        embeds: [embed],
-        components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
-      });
-    } catch (err) {
-      // Ignore if interaction expired
-    }
-  }, 3000);
 }
 
 module.exports = {
-  showSetupModal,
+  handleSetupMenu,
   handleSetupModal
 };
