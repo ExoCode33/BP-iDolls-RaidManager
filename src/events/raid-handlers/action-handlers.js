@@ -1,6 +1,7 @@
 const { getRaid, lockRaid, unlockRaid, updateRaidStatus, updateRaidMessageId, getRaidRegistrations, createRaidPost } = require('../../database/queries');
 const { createRaidEmbed, createRaidButtons } = require('../../utils/embeds');
 const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
+const logger = require('../../utils/logger');
 
 // ═══════════════════════════════════════════════════════════════
 // RAID ACTION HANDLERS
@@ -8,8 +9,8 @@ const { ButtonBuilder, ButtonStyle, ActionRowBuilder } = require('discord.js');
 
 async function handleRaidAction(interaction) {
   const parts = interaction.customId.split('_');
-  const action = parts[3]; // raid_action_select_ACTION_userId
-  const userId = parts[4];
+  const action = parts[2]; // raid_action_ACTION_userId
+  const userId = parts[3];
   
   if (userId !== interaction.user.id) return;
 
@@ -54,6 +55,9 @@ async function handleRaidAction(interaction) {
 async function handleLock(interaction, raid) {
   await lockRaid(raid.id);
 
+  // Log the lock
+  await logger.logRaidLocked(raid, interaction.user, false);
+
   // Update the message to remove Register/Assist buttons
   if (raid.message_id && raid.channel_id) {
     try {
@@ -86,6 +90,9 @@ async function handleLock(interaction, raid) {
 async function handleUnlock(interaction, raid) {
   await unlockRaid(raid.id);
 
+  // Log the unlock
+  await logger.logRaidUnlocked(raid, interaction.user);
+
   // Update the message to restore Register/Assist buttons
   if (raid.message_id && raid.channel_id) {
     try {
@@ -116,6 +123,9 @@ async function handleUnlock(interaction, raid) {
 }
 
 async function handleComplete(interaction, raid) {
+  // Get registrations BEFORE updating status
+  const registrations = await getRaidRegistrations(raid.id);
+  
   await updateRaidStatus(raid.id, 'completed');
 
   // Remove Discord role from all participants
@@ -165,7 +175,7 @@ async function handleComplete(interaction, raid) {
     }
   }
 
-  // ✅ NEW: Delete lock notification message if it exists
+  // Delete lock notification message if it exists
   if (raid.lock_notification_message_id && raid.channel_id) {
     try {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
@@ -177,7 +187,7 @@ async function handleComplete(interaction, raid) {
     }
   }
 
-  // ✅ NEW: Delete reminder message if it exists
+  // Delete reminder message if it exists
   if (raid.reminder_message_id && raid.channel_id) {
     try {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
@@ -188,6 +198,10 @@ async function handleComplete(interaction, raid) {
       console.error('Failed to delete reminder message:', err);
     }
   }
+
+  // Log raid summary and completion
+  await logger.logRaidSummary(raid, registrations);
+  await logger.logRaidCompleted(raid, interaction.user, registrations.length, false);
 
   const backButton = new ButtonBuilder()
     .setCustomId(`raid_back_to_main_${interaction.user.id}`)
@@ -203,6 +217,9 @@ async function handleComplete(interaction, raid) {
 }
 
 async function handleCancel(interaction, raid) {
+  // Get registrations BEFORE updating status
+  const registrations = await getRaidRegistrations(raid.id);
+  
   await updateRaidStatus(raid.id, 'cancelled');
 
   // Remove Discord role
@@ -252,7 +269,7 @@ async function handleCancel(interaction, raid) {
     }
   }
 
-  // ✅ NEW: Delete lock notification message if it exists
+  // Delete lock notification message if it exists
   if (raid.lock_notification_message_id && raid.channel_id) {
     try {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
@@ -264,7 +281,7 @@ async function handleCancel(interaction, raid) {
     }
   }
 
-  // ✅ NEW: Delete reminder message if it exists
+  // Delete reminder message if it exists
   if (raid.reminder_message_id && raid.channel_id) {
     try {
       const channel = await interaction.client.channels.fetch(raid.channel_id);
@@ -275,6 +292,9 @@ async function handleCancel(interaction, raid) {
       console.error('Failed to delete reminder message:', err);
     }
   }
+
+  // Log the cancellation
+  await logger.logRaidCancelled(raid, interaction.user, registrations.length);
 
   const backButton = new ButtonBuilder()
     .setCustomId(`raid_back_to_main_${interaction.user.id}`)
