@@ -8,7 +8,9 @@
     "dev": "nodemon src/index.js",
     "deploy": "node src/deploy-commands.js",
     "db:migrate": "node src/database/migrate.js",
-    "verify": "node verify-setup.js"
+    "verify": "node verify-setup.js",
+    "cleanup": "node cleanup-old-raids.js",
+    "cleanup:confirm": "node cleanup-old-raids.js --confirm"
   },
   "keywords": ["discord", "bot", "raid", "management"],
   "author": "",
