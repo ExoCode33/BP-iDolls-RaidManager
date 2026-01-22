@@ -1,228 +1,30 @@
 const { ModalBuilder, TextInputBuilder, TextInputStyle, ActionRowBuilder, StringSelectMenuBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { raidCreationState, TIME_PRESETS, CHANNEL_PRESETS } = require('./state');
 const { createRaid, getAvailableRaidSlot, getConfig } = require('../../database/queries');
+const logger = require('../../utils/logger');
 
 // ═══════════════════════════════════════════════════════════════
-// RAID CREATION FLOW HANDLERS (PRESET)
+// CREATE RAID HANDLERS
 // ═══════════════════════════════════════════════════════════════
 
-async function startCreateFlow(interaction) {
-  // DON'T defer - we're showing a modal immediately
-  
-  // Initialize state
-  raidCreationState.set(interaction.user.id, { step: 'name' });
+function handleCreateStart(interaction) {
+  // Show size selection
+  const sizes = [
+    { label: '12-Player Raid', value: '12', emoji: '👥' },
+    { label: '20-Player Raid', value: '20', emoji: '👥👥' }
+  ];
 
-  // Show name input modal
-  const modal = new ModalBuilder()
-    .setCustomId(`raid_create_name_${interaction.user.id}`)
-    .setTitle('➕ Create Preset - Step 1/5');
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`raid_create_size_${interaction.user.id}`)
+    .setPlaceholder('Choose raid size')
+    .addOptions(sizes);
 
-  const nameInput = new TextInputBuilder()
-    .setCustomId('name')
-    .setLabel('Raid Name')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('e.g., Saturday Night Raid')
-    .setRequired(true);
+  const row = new ActionRowBuilder().addComponents(selectMenu);
 
-  modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
-
-  await interaction.showModal(modal);
-}
-
-async function handleNameModal(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  try {
-    const name = interaction.fields.getTextInputValue('name');
-    
-    const state = raidCreationState.get(interaction.user.id) || {};
-    state.name = name;
-    state.step = 'date';
-    raidCreationState.set(interaction.user.id, state);
-
-    // Show date input button
-    const dateButton = new ButtonBuilder()
-      .setCustomId(`raid_date_button_${interaction.user.id}`)
-      .setLabel('📅 Enter Date')
-      .setStyle(ButtonStyle.Primary);
-
-    const backButton = new ButtonBuilder()
-      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row = new ActionRowBuilder().addComponents(dateButton, backButton);
-
-    // ✅ FIX: Reply immediately instead of deferUpdate for modal submissions
-    await interaction.update({
-      content: `**Step 2/5:** Enter the date\n**Name:** ${name}\n\nClick the button below to open the date input.`,
-      components: [row]
-    });
-  } catch (error) {
-    console.error('Name modal error:', error);
-    
-    // Try to respond if we haven't yet
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '❌ An error occurred! Please try again.',
-        ephemeral: true
-      });
-    }
-  }
-}
-
-async function handleDateModal(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  try {
-    const date = interaction.fields.getTextInputValue('date');
-    
-    // ✅ FIX: Improved date validation
-    // Check format first
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-      raidCreationState.delete(interaction.user.id);
-      return await interaction.update({
-        content: '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-12-31)',
-        components: []
-      });
-    }
-    
-    // ✅ FIX: Validate actual date
-    const dateObj = new Date(date + 'T00:00:00');
-    if (isNaN(dateObj.getTime())) {
-      raidCreationState.delete(interaction.user.id);
-      return await interaction.update({
-        content: '❌ Invalid date! Please enter a valid date.',
-        components: []
-      });
-    }
-    
-    // ✅ FIX: Prevent dates in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    if (dateObj < today) {
-      raidCreationState.delete(interaction.user.id);
-      return await interaction.update({
-        content: '❌ Date must be today or in the future!',
-        components: []
-      });
-    }
-    
-    const state = raidCreationState.get(interaction.user.id) || {};
-    state.date = date;
-    state.step = 'time';
-    raidCreationState.set(interaction.user.id, state);
-
-    // Show time dropdown
-    const timeOptions = TIME_PRESETS.map(preset => ({
-      label: preset.label,
-      value: preset.value,
-      emoji: '🕐'
-    }));
-
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId(`raid_create_time_${interaction.user.id}`)
-      .setPlaceholder('⏰ Select raid time')
-      .addOptions(timeOptions);
-
-    const backButton = new ButtonBuilder()
-      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row1 = new ActionRowBuilder().addComponents(selectMenu);
-    const row2 = new ActionRowBuilder().addComponents(backButton);
-
-    // ✅ FIX: Reply immediately instead of deferUpdate
-    await interaction.update({
-      content: `**Step 3/5:** Select raid time\n**Name:** ${state.name}\n**Date:** ${date}`,
-      components: [row1, row2]
-    });
-  } catch (error) {
-    console.error('Date modal error:', error);
-    
-    // Try to respond if we haven't yet
-    if (!interaction.replied && !interaction.deferred) {
-      await interaction.reply({
-        content: '❌ An error occurred! Please try again.',
-        ephemeral: true
-      });
-    }
-  }
-}
-
-async function handleDateButton(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  const state = raidCreationState.get(interaction.user.id);
-  if (!state || !state.name) {
-    return await interaction.reply({
-      content: '❌ Session expired. Please start again with /raid',
-      flags: 64
-    });
-  }
-
-  // Show date modal
-  const modal = new ModalBuilder()
-    .setCustomId(`raid_create_date_${interaction.user.id}`)
-    .setTitle('➕ Create Preset - Step 2/5');
-
-  const dateInput = new TextInputBuilder()
-    .setCustomId('date')
-    .setLabel('Date (YYYY-MM-DD)')
-    .setStyle(TextInputStyle.Short)
-    .setPlaceholder('2026-01-20')
-    .setRequired(true);
-
-  modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
-
-  await interaction.showModal(modal);
-}
-
-async function handleTimeSelect(interaction) {
-  const userId = interaction.customId.split('_').pop();
-  if (userId !== interaction.user.id) return;
-
-  await interaction.deferUpdate();
-
-  try {
-    const time = interaction.values[0];
-    
-    const state = raidCreationState.get(interaction.user.id) || {};
-    state.time = time;
-    state.step = 'size';
-    raidCreationState.set(interaction.user.id, state);
-
-    // Show size dropdown
-    const sizeOptions = [
-      { label: '12-player Raid', value: '12', emoji: '🎯' },
-      { label: '20-player Raid', value: '20', emoji: '🎯' }
-    ];
-
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId(`raid_create_size_${interaction.user.id}`)
-      .setPlaceholder('👥 Select raid size')
-      .addOptions(sizeOptions);
-
-    const backButton = new ButtonBuilder()
-      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
-      .setStyle(ButtonStyle.Secondary);
-
-    const row1 = new ActionRowBuilder().addComponents(selectMenu);
-    const row2 = new ActionRowBuilder().addComponents(backButton);
-
-    await interaction.editReply({
-      content: `**Step 4/5:** Select raid size\n**Name:** ${state.name}\n**Date:** ${state.date}\n**Time:** ${time} UTC`,
-      components: [row1, row2]
-    });
-  } catch (error) {
-    console.error('Time select error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
-  }
+  return {
+    content: '**Step 1/5:** Select raid size',
+    components: [row]
+  };
 }
 
 async function handleSizeSelect(interaction) {
@@ -231,55 +33,70 @@ async function handleSizeSelect(interaction) {
 
   await interaction.deferUpdate();
 
-  try {
-    const size = parseInt(interaction.values[0]);
-    
-    const state = raidCreationState.get(interaction.user.id) || {};
-    state.size = size;
-    state.step = 'channel';
-    raidCreationState.set(interaction.user.id, state);
+  const size = parseInt(interaction.values[0]);
+  
+  // Initialize state
+  raidCreationState.set(interaction.user.id, {
+    size,
+    step: 'time'
+  });
 
-    // Fetch actual channels from the guild
-    const guild = interaction.guild;
-    const textChannels = guild.channels.cache
-      .filter(channel => channel.type === 0) // 0 = Text channels
-      .sort((a, b) => a.position - b.position);
+  // Show time selection
+  const times = TIME_PRESETS.map(time => ({
+    label: time.label,
+    value: time.value,
+    emoji: '⏰'
+  }));
 
-    // Limit to first 25 channels (Discord limit)
-    const channelsArray = Array.from(textChannels.values()).slice(0, 25);
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`raid_create_time_${interaction.user.id}`)
+    .setPlaceholder('Choose raid time (UTC)')
+    .addOptions(times);
 
-    if (channelsArray.length === 0) {
-      return await redirectToMainMenu(interaction, '❌ No text channels found!');
-    }
+  const row = new ActionRowBuilder().addComponents(selectMenu);
 
-    const channels = channelsArray.map(channel => ({
-      label: `#${channel.name}`,
-      value: channel.id,
-      description: channel.topic ? channel.topic.substring(0, 100) : 'No description',
-      emoji: '📺'
-    }));
+  await interaction.editReply({
+    content: `**Step 2/5:** Select raid time (UTC)\n✅ Size: ${size} players`,
+    components: [row]
+  });
+}
 
-    const selectMenu = new StringSelectMenuBuilder()
-      .setCustomId(`raid_create_channel_${interaction.user.id}`)
-      .setPlaceholder('📺 Select channel')
-      .addOptions(channels);
+async function handleTimeSelect(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
 
-    const backButton = new ButtonBuilder()
-      .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-      .setLabel('◀️ Back to Main Menu')
-      .setStyle(ButtonStyle.Secondary);
+  await interaction.deferUpdate();
 
-    const row1 = new ActionRowBuilder().addComponents(selectMenu);
-    const row2 = new ActionRowBuilder().addComponents(backButton);
-
-    await interaction.editReply({
-      content: `**Step 5/5:** Select channel\n**Name:** ${state.name}\n**Date:** ${state.date}\n**Time:** ${state.time} UTC\n**Size:** ${size}-player`,
-      components: [row1, row2]
+  const state = raidCreationState.get(interaction.user.id);
+  if (!state) {
+    return await interaction.editReply({ 
+      content: '❌ Session expired. Please start again.',
+      components: []
     });
-  } catch (error) {
-    console.error('Size select error:', error);
-    await redirectToMainMenu(interaction, '❌ An error occurred! Redirecting to main menu...');
   }
+
+  state.time = interaction.values[0];
+  state.step = 'channel';
+  raidCreationState.set(interaction.user.id, state);
+
+  // Show channel selection
+  const channels = CHANNEL_PRESETS.map(ch => ({
+    label: ch.label,
+    value: ch.value,
+    emoji: '📢'
+  }));
+
+  const selectMenu = new StringSelectMenuBuilder()
+    .setCustomId(`raid_create_channel_${interaction.user.id}`)
+    .setPlaceholder('Choose raid channel')
+    .addOptions(channels);
+
+  const row = new ActionRowBuilder().addComponents(selectMenu);
+
+  await interaction.editReply({
+    content: `**Step 3/5:** Select raid channel\n✅ Size: ${state.size} players\n✅ Time: ${state.time} UTC`,
+    components: [row]
+  });
 }
 
 async function handleChannelSelect(interaction) {
@@ -288,44 +105,139 @@ async function handleChannelSelect(interaction) {
 
   await interaction.deferUpdate();
 
+  const state = raidCreationState.get(interaction.user.id);
+  if (!state) {
+    return await interaction.editReply({ 
+      content: '❌ Session expired. Please start again.',
+      components: []
+    });
+  }
+
+  state.channel = interaction.values[0];
+  state.step = 'name';
+  raidCreationState.set(interaction.user.id, state);
+
+  // Show name input modal
+  const modal = new ModalBuilder()
+    .setCustomId(`raid_create_name_${interaction.user.id}`)
+    .setTitle('Raid Name');
+
+  const nameInput = new TextInputBuilder()
+    .setCustomId('name')
+    .setLabel('Enter raid name')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g., Saturday Night Raid')
+    .setRequired(true)
+    .setMaxLength(200);
+
+  const row = new ActionRowBuilder().addComponents(nameInput);
+  modal.addComponents(row);
+
+  await interaction.showModal(modal);
+}
+
+async function handleNameModal(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  const state = raidCreationState.get(interaction.user.id);
+  if (!state) {
+    return await interaction.editReply({ 
+      content: '❌ Session expired. Please start again.',
+      components: []
+    });
+  }
+
+  state.name = interaction.fields.getTextInputValue('name').trim();
+  state.step = 'date';
+  raidCreationState.set(interaction.user.id, state);
+
+  // Show date input modal
+  const modal = new ModalBuilder()
+    .setCustomId(`raid_create_date_${interaction.user.id}`)
+    .setTitle('Raid Date');
+
+  const dateInput = new TextInputBuilder()
+    .setCustomId('date')
+    .setLabel('Enter raid date (YYYY-MM-DD)')
+    .setStyle(TextInputStyle.Short)
+    .setPlaceholder('e.g., 2026-01-25')
+    .setRequired(true);
+
+  const row = new ActionRowBuilder().addComponents(dateInput);
+  modal.addComponents(row);
+
+  await interaction.showModal(modal);
+}
+
+async function handleDateModal(interaction) {
+  const userId = interaction.customId.split('_').pop();
+  if (userId !== interaction.user.id) return;
+
+  await interaction.deferUpdate();
+
+  const state = raidCreationState.get(interaction.user.id);
+  if (!state) {
+    return await interaction.editReply({ 
+      content: '❌ Session expired. Please start again.',
+      components: []
+    });
+  }
+
+  const dateStr = interaction.fields.getTextInputValue('date').trim();
+  
+  // Validate date format
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return await interaction.editReply({
+      content: '❌ Invalid date format! Please use YYYY-MM-DD (e.g., 2026-01-25)',
+      components: []
+    });
+  }
+
+  // Create datetime string
+  const startTime = new Date(`${dateStr}T${state.time}:00Z`);
+  
+  // Validate date is in the future
+  if (startTime <= new Date()) {
+    return await interaction.editReply({
+      content: '❌ Raid time must be in the future!',
+      components: []
+    });
+  }
+
+  state.date = dateStr;
+  
+  // Calculate slots based on size
+  const slots = state.size === 12 
+    ? { tank: 2, support: 2, dps: 8 }
+    : { tank: 3, support: 3, dps: 14 };
+
+  // Get channel ID and role ID
+  const channelId = state.channel;
+  const raidSlot = await getAvailableRaidSlot(startTime);
+  
+  if (raidSlot === null) {
+    raidCreationState.delete(interaction.user.id);
+    return await interaction.editReply({
+      content: '❌ Both raid slots are occupied at this time! Please choose a different time or complete/cancel existing raids.',
+      components: []
+    });
+  }
+
+  const roleId = await getConfig(raidSlot === 1 ? 'raid1_role_id' : 'raid2_role_id');
+  
+  if (roleId === 'not_set') {
+    raidCreationState.delete(interaction.user.id);
+    return await interaction.editReply({
+      content: `❌ Raid slot ${raidSlot} role has not been configured! Please run \`/raid setup\` first.`,
+      components: []
+    });
+  }
+
+  // Create the raid
   try {
-    const channelId = interaction.values[0];
-    
-    const state = raidCreationState.get(interaction.user.id) || {};
-    state.channelId = channelId;
-
-    // Create the raid
-    let startTime = new Date(`${state.date}T${state.time}:00Z`);
-    if (isNaN(startTime.getTime())) {
-      raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Invalid date/time format! Redirecting to main menu...');
-    }
-
-    // ✅ FIX: If the time is in the past, add 1 day
-    // This handles cases where UTC time crosses midnight
-    // Example: 8 PM EST = 1 AM UTC next day
-    const now = new Date();
-    if (startTime < now) {
-      startTime.setDate(startTime.getDate() + 1);
-      console.log(`⚠️ Raid time was in the past, moved to next day: ${startTime.toISOString()}`);
-    }
-
-    const raidSlot = await getAvailableRaidSlot();
-    if (!raidSlot) {
-      raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Maximum 2 active raids allowed! Redirecting to main menu...');
-    }
-
-    const roleId = await getConfig(`raid${raidSlot}_role_id`);
-    if (!roleId || roleId === 'not_set') {
-      raidCreationState.delete(interaction.user.id);
-      return await redirectToMainMenu(interaction, '❌ Raid roles not configured! Use Setup first. Redirecting to main menu...');
-    }
-
-    const slots = state.size === 12 
-      ? { tank: 2, support: 2, dps: 8 } 
-      : { tank: 4, support: 4, dps: 12 };
-
     const raid = await createRaid({
       name: state.name,
       raid_size: state.size,
@@ -341,6 +253,9 @@ async function handleChannelSelect(interaction) {
 
     raidCreationState.delete(interaction.user.id);
 
+    // Log raid creation
+    await logger.logRaidCreated(raid, interaction.user);
+
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
       .setLabel('◀️ Back to Main Menu')
@@ -349,69 +264,24 @@ async function handleChannelSelect(interaction) {
     const row = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
-      content: `✅ **Raid Preset Created Successfully!**\n\n**${state.name}**\n**Size:** ${state.size}-player\n**Time:** <t:${Math.floor(startTime.getTime() / 1000)}:F>\n**Channel:** <#${channelId}>\n\n⚠️ Raid is created but **NOT posted yet**.\nUse \`/raid\` → **🚀 Start Raid** to post it to the channel.`,
+      content: `✅ Raid created successfully!\n\n**${state.name}**\n📅 ${dateStr} at ${state.time} UTC\n👥 ${state.size} players\n📍 <#${channelId}>\n🎭 Slot ${raidSlot}\n\n⚠️ **Next step:** Use the "Post Raid" menu to publish it!`,
       components: [row]
     });
-
   } catch (error) {
     console.error('Create raid error:', error);
     raidCreationState.delete(interaction.user.id);
-    await redirectToMainMenu(interaction, '❌ Failed to create raid! Redirecting to main menu...');
-  }
-}
-
-async function redirectToMainMenu(interaction, errorMessage) {
-  const { 
-    createMainMenuEmbed, 
-    createMainMenuButtons,
-    createRosterDropdown,
-    createLockUnlockDropdown,
-    createPresetDropdown,
-    createEmbedAndRoleDropdown
-  } = require('./main-menu');
-  
-  const embed = await createMainMenuEmbed();
-  const buttonRow = createMainMenuButtons(interaction.user.id);
-  const rosterRow = createRosterDropdown(interaction.user.id);
-  const lockUnlockRow = createLockUnlockDropdown(interaction.user.id);
-  const presetRow = createPresetDropdown(interaction.user.id);
-  const managementRow = createEmbedAndRoleDropdown(interaction.user.id);
-
-  if (!interaction.deferred && !interaction.replied) {
-    await interaction.reply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow],
-      flags: 64
-    });
-  } else {
     await interaction.editReply({
-      content: errorMessage,
-      embeds: [embed],
-      components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
+      content: '❌ Failed to create raid. Please try again.',
+      components: []
     });
   }
-
-  // Auto-remove error message after 3 seconds
-  setTimeout(async () => {
-    try {
-      await interaction.editReply({
-        content: null,
-        embeds: [embed],
-        components: [buttonRow, rosterRow, lockUnlockRow, presetRow, managementRow]
-      });
-    } catch (err) {
-      // Ignore if interaction expired
-    }
-  }, 3000);
 }
 
 module.exports = {
-  startCreateFlow,
-  handleNameModal,
-  handleDateButton,
-  handleDateModal,
-  handleTimeSelect,
+  handleCreateStart,
   handleSizeSelect,
-  handleChannelSelect
+  handleTimeSelect,
+  handleChannelSelect,
+  handleNameModal,
+  handleDateModal
 };
