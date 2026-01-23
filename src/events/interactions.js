@@ -15,7 +15,6 @@ const {
 const { getClassEmoji, inferRole } = require('../utils/formatters');
 const { createRaidEmbed, createRaidButtons } = require('../utils/embeds');
 const raidHandlers = require('./raid-handlers');
-const logger = require('../utils/logger');
 
 // ✅ NEW - Import main DB connection for AS updates
 const { mainDB } = require('../database/connection');
@@ -1098,9 +1097,6 @@ async function processRegistration(interaction, raid, character, registrationTyp
       }
     }
 
-    // Log the registration
-    await logger.logPlayerRegistered(raid, result.registration, interaction.user, demotedPlayer);
-
     // ✅ UPDATED - Show AS update in success message
     let successMessage = '';
     if (status === 'registered') {
@@ -1196,9 +1192,6 @@ async function handleUnregister(interaction, raidId) {
         console.error('Failed to update raid message:', err);
       }
     }
-
-    // Log the unregistration
-    await logger.logPlayerUnregistered(raid, registration, interaction.user, wasInRaid);
 
     await interaction.editReply({ content: '✅ You have been unregistered from this raid!' });
 
