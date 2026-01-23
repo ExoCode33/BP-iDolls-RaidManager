@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 const { startReminderScheduler, getSchedulerHealth } = require('./utils/scheduler');
 const { checkMainDBHealth, checkEventDBHealth, getPoolStats } = require('./database/connection');
-const logger = require('./utils/logger');
 
 // Import all interaction handlers
 const { 
@@ -291,16 +290,10 @@ client.once(Events.ClientReady, async (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
   console.log(`📊 Serving ${c.guilds.cache.size} guild(s)`);
   
-  // Initialize logger
-  await logger.initialize(c);
-  
   await runMigrations();
   await deployCommands();
   
   startReminderScheduler(client);
-  
-  // Log successful startup
-  await logger.logSystem('Bot Ready', `Bot logged in as ${c.user.tag} and is ready to serve ${c.guilds.cache.size} guild(s)`, 'success');
   
   // ✅ NEW - Log initial health status
   setTimeout(async () => {
