@@ -6,8 +6,10 @@ const logger = require('../../utils/logger');
 // SETUP HANDLERS
 // ═══════════════════════════════════════════════════════════════
 
-async function handleSetupMenu(interaction) {
-  await interaction.deferReply({ flags: 64 });
+// ✅ FIX: Renamed from handleSetupMenu to showSetupModal for consistency
+async function showSetupModal(interaction) {
+  // ✅ FIX: Don't defer - modals must be immediate response
+  // await interaction.deferReply({ flags: 64 });
 
   const modal = new ModalBuilder()
     .setCustomId(`raid_setup_modal_${interaction.user.id}`)
@@ -93,6 +95,6 @@ async function handleSetupModal(interaction) {
 }
 
 module.exports = {
-  handleSetupMenu,
+  showSetupModal,
   handleSetupModal
 };
