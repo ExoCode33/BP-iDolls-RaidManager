@@ -11,7 +11,7 @@ function handleCreateStart(interaction) {
   // Show size selection
   const sizes = [
     { label: '12-Player Raid', value: '12', emoji: '👥' },
-    { label: '20-Player Raid', value: '20', emoji: '👥' }
+    { label: '20-Player Raid', value: '20', emoji: '👥👥' }
   ];
 
   const selectMenu = new StringSelectMenuBuilder()
