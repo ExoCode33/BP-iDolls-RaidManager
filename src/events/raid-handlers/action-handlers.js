@@ -126,23 +126,8 @@ async function handleComplete(interaction, raid) {
   // Get registrations BEFORE updating status
   const registrations = await getRaidRegistrations(raid.id);
   
-  // Update status immediately
   await updateRaidStatus(raid.id, 'completed');
 
-  // ✅ RESPOND TO INTERACTION IMMEDIATELY (prevents timeout)
-  const backButton = new ButtonBuilder()
-    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
-    .setLabel('◀️ Back to Main Menu')
-    .setStyle(ButtonStyle.Primary);
-
-  const row = new ActionRowBuilder().addComponents(backButton);
-
-  await interaction.editReply({
-    content: `✅ Raid "${raid.name}" has been completed!\n\n⏳ Cleaning up roles and messages...`,
-    components: [row]
-  });
-
-  // ✅ NOW DO SLOW CLEANUP IN BACKGROUND
   // Remove Discord role from all participants
   const guild = interaction.guild;
   
@@ -218,17 +203,6 @@ async function handleComplete(interaction, raid) {
   await logger.logRaidSummary(raid, registrations);
   await logger.logRaidCompleted(raid, interaction.user, registrations.length, false);
 
-  console.log(`✅ Raid ${raid.id} fully completed and cleaned up`);
-}
-
-async function handleCancel(interaction, raid) {
-  // Get registrations BEFORE updating status
-  const registrations = await getRaidRegistrations(raid.id);
-  
-  // Update status immediately
-  await updateRaidStatus(raid.id, 'cancelled');
-
-  // ✅ RESPOND TO INTERACTION IMMEDIATELY (prevents timeout)
   const backButton = new ButtonBuilder()
     .setCustomId(`raid_back_to_main_${interaction.user.id}`)
     .setLabel('◀️ Back to Main Menu')
@@ -237,11 +211,17 @@ async function handleCancel(interaction, raid) {
   const row = new ActionRowBuilder().addComponents(backButton);
 
   await interaction.editReply({
-    content: `✅ Raid "${raid.name}" has been cancelled!\n\n⏳ Cleaning up roles and messages...`,
+    content: `✅ Raid "${raid.name}" has been completed!\n\n**Cleanup performed:**\n✅ Raid role removed from all participants\n✅ Raid message deleted\n✅ Database updated to 'completed'`,
     components: [row]
   });
+}
 
-  // ✅ NOW DO SLOW CLEANUP IN BACKGROUND
+async function handleCancel(interaction, raid) {
+  // Get registrations BEFORE updating status
+  const registrations = await getRaidRegistrations(raid.id);
+  
+  await updateRaidStatus(raid.id, 'cancelled');
+
   // Remove Discord role
   const guild = interaction.guild;
   
@@ -316,7 +296,17 @@ async function handleCancel(interaction, raid) {
   // Log the cancellation
   await logger.logRaidCancelled(raid, interaction.user, registrations.length);
 
-  console.log(`✅ Raid ${raid.id} fully cancelled and cleaned up`);
+  const backButton = new ButtonBuilder()
+    .setCustomId(`raid_back_to_main_${interaction.user.id}`)
+    .setLabel('◀️ Back to Main Menu')
+    .setStyle(ButtonStyle.Primary);
+
+  const row = new ActionRowBuilder().addComponents(backButton);
+
+  await interaction.editReply({
+    content: `✅ Raid "${raid.name}" has been cancelled!\n\n**Cleanup performed:**\n✅ Raid role removed from all participants\n✅ Raid message deleted\n✅ Database updated to 'cancelled'`,
+    components: [row]
+  });
 }
 
 async function handleRepost(interaction, raid) {
