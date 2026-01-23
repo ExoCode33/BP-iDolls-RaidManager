@@ -17,6 +17,7 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply({ flags: 64 }); // Ephemeral
 
+    // ✅ FIX: await the async function
     const embed = await createMainMenuEmbed();
     const buttonRow = createMainMenuButtons(interaction.user.id);
     const rosterRow = createRosterDropdown(interaction.user.id);
