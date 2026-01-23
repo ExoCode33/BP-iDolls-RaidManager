@@ -226,7 +226,10 @@ async function handlePresetMenu(interaction) {
     switch (action) {
       case 'create':
         const createHandlers = require('./create-handlers');
-        await createHandlers.startCreateFlow(interaction);
+        // ✅ FIX: Call handleCreateStart instead of startCreateFlow
+        const result = createHandlers.handleCreateStart(interaction);
+        await interaction.deferUpdate();
+        await interaction.editReply(result);
         break;
       
       case 'edit':
