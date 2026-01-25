@@ -119,16 +119,13 @@ async function handleDateModal(interaction) {
     state.step = 'time';
     raidCreationState.set(interaction.user.id, state);
 
-    // Show time dropdown
-    const timeOptions = TIME_PRESETS.map(preset => ({
-      label: preset.label,
-      value: preset.value,
-      emoji: '🕐'
-    }));
+    // ✅ NEW: Get dynamic time options with EST descriptions based on selected date
+    const { getTimePresetsWithDescriptions } = require('./state');
+    const timeOptions = getTimePresetsWithDescriptions(date);
 
     const selectMenu = new StringSelectMenuBuilder()
       .setCustomId(`raid_create_time_${interaction.user.id}`)
-      .setPlaceholder('⏰ Select raid time')
+      .setPlaceholder('⏰ Select raid time (UTC)')
       .addOptions(timeOptions);
 
     const backButton = new ButtonBuilder()
@@ -141,7 +138,7 @@ async function handleDateModal(interaction) {
 
     // ✅ FIX: Reply immediately instead of deferUpdate
     await interaction.update({
-      content: `**Step 3/5:** Select raid time\n**Name:** ${state.name}\n**Date:** ${date}`,
+      content: `**Step 3/5:** Select raid time\n**Name:** ${state.name}\n**Date:** ${date}\n\n⏰ Times shown in UTC with EST equivalent`,
       components: [row1, row2]
     });
   } catch (error) {
