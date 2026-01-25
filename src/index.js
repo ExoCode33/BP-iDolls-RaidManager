@@ -21,7 +21,6 @@ const {
   handleQuickComplete,
   handleQuickEdit,
   handleDateButton,
-  handleDeleteConfirm,
   handlePresetMenu,
   handleLockUnlockMenu,
   handleManagementMenu,
@@ -31,15 +30,30 @@ const {
   handleChannelSelect,
   handleStartSelect,
   handleRaidAction,
-  handleEditSelect,
   handleEditRaidSelect,
-  handleDeleteSelect,
   handleSetupModal,
   handleNameModal,
   handleDateModal
 } = require('./events/interactions');
 
 const { handleRosterSelect, handleRosterPromote, handleRosterDemote, handleRosterUnregister } = require('./events/raid-handlers/roster-handlers');
+
+// ✅ Import edit/delete handlers
+const {
+  handleEditSelect,
+  handleDeleteSelect,
+  handleDeleteConfirm,
+  handleEditPresetName,
+  handleEditPresetNameModal,
+  handleEditPresetTime,
+  handleEditPresetTimeModal,
+  handleEditPresetChannel,
+  handleEditPresetChannelSelect,
+  handleEditRaidName,
+  handleEditRaidNameModal,
+  handleEditRaidTime,
+  handleEditRaidTimeModal
+} = require('./events/raid-handlers/edit-delete-handlers');
 
 const client = new Client({
   intents: [
@@ -311,7 +325,7 @@ client.once(Events.ClientReady, async (c) => {
   }, 3000);
 });
 
-// ✅ IMPROVED - Better interaction routing with error handling
+// ✅ FIXED - Complete interaction handlers with all edit functionality
 const INTERACTION_HANDLERS = {
   button: {
     'raid_back_to_main_': handleBackToMain,
@@ -320,6 +334,13 @@ const INTERACTION_HANDLERS = {
     'raid_quick_edit_': handleQuickEdit,
     'raid_date_button_': handleDateButton,
     'raid_delete_confirm_': handleDeleteConfirm,
+    // Edit preset buttons (unposted raids)
+    'raid_edit_name_': handleEditPresetName,
+    'raid_edit_time_': handleEditPresetTime,
+    'raid_edit_channel_': handleEditPresetChannel,
+    // Edit raid buttons (posted raids)
+    'raid_edit_raid_name_': handleEditRaidName,
+    'raid_edit_raid_time_': handleEditRaidTime,
   },
   selectMenu: {
     'char_select_': handleCharacterSelect,
@@ -343,12 +364,20 @@ const INTERACTION_HANDLERS = {
     'raid_edit_select_': handleEditSelect,
     'raid_edit_raid_select_': handleEditRaidSelect,
     'raid_delete_select_': handleDeleteSelect,
+    // Edit preset channel selector
+    'raid_edit_channel_select_': handleEditPresetChannelSelect,
   },
   modal: {
     'manual_ign_modal_': handleManualIGNModal,
     'raid_setup_modal_': handleSetupModal,
     'raid_create_name_': handleNameModal,
     'raid_create_date_': handleDateModal,
+    // Edit preset modals
+    'raid_edit_name_modal_': handleEditPresetNameModal,
+    'raid_edit_time_modal_': handleEditPresetTimeModal,
+    // Edit raid modals
+    'raid_edit_raid_name_modal_': handleEditRaidNameModal,
+    'raid_edit_raid_time_modal_': handleEditRaidTimeModal,
   }
 };
 
