@@ -26,10 +26,24 @@ const {
 } = require('./create-handlers');
 const { showStartRaidSelector, handleStartSelect } = require('./start-handlers');
 const { handleRaidAction } = require('./action-handlers');
-const { handleEditSelect, handleDeleteSelect, handleDeleteConfirm } = require('./edit-delete-handlers');
+const { 
+  handleEditSelect, 
+  handleDeleteSelect, 
+  handleDeleteConfirm,
+  handleEditPresetName,
+  handleEditPresetNameModal,
+  handleEditPresetTime,
+  handleEditPresetTimeModal,
+  handleEditPresetChannel,
+  handleEditPresetChannelSelect,
+  handleEditRaidName,
+  handleEditRaidNameModal,
+  handleEditRaidTime,
+  handleEditRaidTimeModal
+} = require('./edit-delete-handlers');
 
 module.exports = {
-  // Main menu handlers (NEW)
+  // Main menu handlers
   handleBackToMain,
   handleRosterMenu,
   handlePresetMenu,
@@ -51,10 +65,20 @@ module.exports = {
   handleSizeSelect,
   handleChannelSelect,
   
-  // Edit/Delete
+  // Edit/Delete - ✅ NOW EXPORTED
   handleEditSelect,
   handleDeleteSelect,
   handleDeleteConfirm,
+  handleEditPresetName,
+  handleEditPresetNameModal,
+  handleEditPresetTime,
+  handleEditPresetTimeModal,
+  handleEditPresetChannel,
+  handleEditPresetChannelSelect,
+  handleEditRaidName,
+  handleEditRaidNameModal,
+  handleEditRaidTime,
+  handleEditRaidTimeModal,
   
   // Start
   handleStartSelect,
