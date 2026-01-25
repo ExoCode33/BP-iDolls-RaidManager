@@ -461,18 +461,27 @@ async function handleEditRaidSelect(interaction) {
       .setLabel('🕐 Edit Time')
       .setStyle(ButtonStyle.Secondary);
 
-    const cancelButton = new ButtonBuilder()
-      .setCustomId(`raid_action_select_cancel_${raidId}_${interaction.user.id}`)
-      .setLabel('❌ Cancel Raid')
-      .setStyle(ButtonStyle.Danger);
+    // ✅ FIX: Use correct dropdown format for cancel action
+    const cancelOptions = [{
+      label: `Cancel "${raid.name}"`,
+      value: raidId.toString(),
+      description: 'Permanently cancel this raid',
+      emoji: '❌'
+    }];
+
+    const cancelDropdown = new StringSelectMenuBuilder()
+      .setCustomId(`raid_action_select_cancel_${interaction.user.id}`)
+      .setPlaceholder('❌ Cancel Raid (dropdown to confirm)')
+      .addOptions(cancelOptions);
 
     const backButton = new ButtonBuilder()
       .setCustomId(`raid_back_to_main_${interaction.user.id}`)
       .setLabel('◀️ Back')
       .setStyle(ButtonStyle.Primary);
 
-    const row1 = new ActionRowBuilder().addComponents(editNameButton, editTimeButton, cancelButton);
-    const row2 = new ActionRowBuilder().addComponents(backButton);
+    const row1 = new ActionRowBuilder().addComponents(editNameButton, editTimeButton);
+    const row2 = new ActionRowBuilder().addComponents(cancelDropdown);
+    const row3 = new ActionRowBuilder().addComponents(backButton);
 
     await interaction.editReply({
       content: `✏️ **Edit: ${raid.name}**\n\n` +
@@ -483,7 +492,7 @@ async function handleEditRaidSelect(interaction) {
                `📺 Channel: <#${raid.channel_id}>\n` +
                `${raid.locked ? '🔒 Locked' : '🔓 Open'}\n\n` +
                `**What would you like to do?**`,
-      components: [row1, row2]
+      components: [row1, row2, row3]
     });
 
   } catch (error) {
