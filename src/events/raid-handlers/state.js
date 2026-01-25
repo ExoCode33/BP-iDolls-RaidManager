@@ -11,7 +11,18 @@ const CHANNEL_PRESETS = {
   // The system will auto-fetch all channels from your guild
 };
 
-// Time presets (all in UTC) - Full 24-hour coverage
+// ✅ IMPORTANT: Time presets are in UTC
+// EST is UTC-5 (or UTC-4 during daylight saving)
+// To convert: EST + 5 hours = UTC (or EST + 4 hours = UTC during DST)
+// 
+// Example: 9:00 PM EST = 2:00 AM UTC next day (9 PM + 5 hours = 2 AM)
+//          8:00 PM EST = 1:00 AM UTC next day (8 PM + 5 hours = 1 AM)
+//
+// When creating a raid:
+// 1. Enter the DATE in your local timezone
+// 2. Select the TIME in UTC from the dropdown
+// 3. The bot will create the raid at that exact UTC time
+
 const TIME_PRESETS = [
   { label: '12:00 AM EST (05:00 UTC)', value: '05:00' },
   { label: '1:00 AM EST (06:00 UTC)', value: '06:00' },
