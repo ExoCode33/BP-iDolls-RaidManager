@@ -84,7 +84,7 @@ async function handleDateModal(interaction) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       raidCreationState.delete(interaction.user.id);
       return await interaction.update({
-        content: '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-12-31)',
+        content: '❌ Invalid date format! Use YYYY-MM-DD (e.g., 2026-01-25)',
         components: []
       });
     }
@@ -99,13 +99,17 @@ async function handleDateModal(interaction) {
       });
     }
     
-    // ✅ FIX: Prevent dates in the past
+    // ✅ FIX: Allow today's date (don't require future dates at this step)
+    // We'll validate the final datetime later when time is selected
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    if (dateObj < today) {
+    const inputDate = new Date(date + 'T00:00:00');
+    inputDate.setHours(0, 0, 0, 0);
+    
+    if (inputDate < today) {
       raidCreationState.delete(interaction.user.id);
       return await interaction.update({
-        content: '❌ Date must be today or in the future!',
+        content: '❌ Date cannot be in the past! Please enter today or a future date.',
         components: []
       });
     }
@@ -174,7 +178,7 @@ async function handleDateButton(interaction) {
     .setCustomId('date')
     .setLabel('Date (YYYY-MM-DD)')
     .setStyle(TextInputStyle.Short)
-    .setPlaceholder('2026-01-20')
+    .setPlaceholder('2026-01-25')
     .setRequired(true);
 
   modal.addComponents(new ActionRowBuilder().addComponents(dateInput));
@@ -294,20 +298,23 @@ async function handleChannelSelect(interaction) {
     const state = raidCreationState.get(interaction.user.id) || {};
     state.channelId = channelId;
 
-    // Create the raid
+    // ✅ FIXED: Proper UTC datetime construction
+    // The time value from TIME_PRESETS is already in UTC (e.g., "01:00" = 1 AM UTC = 8 PM EST previous day)
     let startTime = new Date(`${state.date}T${state.time}:00Z`);
+    
     if (isNaN(startTime.getTime())) {
       raidCreationState.delete(interaction.user.id);
       return await redirectToMainMenu(interaction, '❌ Invalid date/time format! Redirecting to main menu...');
     }
 
-    // ✅ FIX: If the time is in the past, add 1 day
-    // This handles cases where UTC time crosses midnight
-    // Example: 8 PM EST = 1 AM UTC next day
+    // ✅ IMPORTANT: Do NOT add a day if time is in the past
+    // The user selected the date and time intentionally
+    // If they want tomorrow, they should select tomorrow's date
+    // We only validate that the final datetime is not in the past
     const now = new Date();
     if (startTime < now) {
-      startTime.setDate(startTime.getDate() + 1);
-      console.log(`⚠️ Raid time was in the past, moved to next day: ${startTime.toISOString()}`);
+      raidCreationState.delete(interaction.user.id);
+      return await redirectToMainMenu(interaction, '❌ Raid time is in the past! Please select a future date/time. Redirecting to main menu...');
     }
 
     const raidSlot = await getAvailableRaidSlot();
