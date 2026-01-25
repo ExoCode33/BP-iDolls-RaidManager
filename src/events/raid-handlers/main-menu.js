@@ -26,7 +26,11 @@ async function createMainMenuEmbed() {
   } else {
     const { getRaidRegistrations } = require('../../database/queries');
     
-    for (const raid of raids) {
+    // ✅ FIX: Sort raids by created_at ASC (oldest first = first created shows first)
+    const sortedRaids = raids.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    
+    for (let i = 0; i < sortedRaids.length; i++) {
+      const raid = sortedRaids[i];
       const startTime = new Date(raid.start_time);
       
       // Format: Mon DD, YYYY HH:MM AM/PM UTC
@@ -71,6 +75,11 @@ async function createMainMenuEmbed() {
       ansiContent += `${postStatus} \u001b[1;34mName:\u001b[0m \u001b[1;37m${raid.name}\u001b[0m ${lockStatus}\n`;
       ansiContent += `\u001b[1;34m👥 Size:\u001b[0m ${playerCount}\n`;
       ansiContent += `\u001b[1;34m🕐 Time:\u001b[0m \u001b[0;37m${formattedTime}\u001b[0m\n`;
+      
+      // ✅ FIX: Add spacing between raids (except after the last one)
+      if (i < sortedRaids.length - 1) {
+        ansiContent += '\n'; // Empty line between raids
+      }
     }
   }
   
