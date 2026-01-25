@@ -811,8 +811,9 @@ async function handleRegistration(interaction, raidId, registrationType) {
 
     const row = new ActionRowBuilder().addComponents(selectMenu);
 
+    // ✅ CHANGE: Add user ping here
     await interaction.editReply({
-      content: 'Select your character:',
+      content: `<@${interaction.user.id}> Select your character:`,
       components: [row]
     });
 
